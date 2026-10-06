@@ -1,0 +1,50 @@
+# Supabase CLI configuration for Spark (used by `npx supabase start`, `db push`,
+# and `functions deploy`). Project ref is linked with `npx supabase link`.
+project_id = "spark"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/auth/callback/", "https://thomasg42.github.io/spark/auth/callback/"]
+jwt_expiry = 3600
+enable_signup = true
+minimum_password_length = 10
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+otp_length = 6
+otp_expiry = 3600
+
+[functions.answers]
+verify_jwt = true
+
+[functions.checkins]
+verify_jwt = true
+
+[functions.date-ideas]
+verify_jwt = true

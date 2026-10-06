@@ -1,0 +1,70 @@
+# Tests, builds and publishes Spark to GitHub Pages on every push to main.
+#
+# Demo mode vs live mode:
+#   With no repository variables set, the site builds in DEMO MODE (sample data,
+#   stored only in the visitor's browser). To connect a real Supabase project, set
+#   repository VARIABLES (Settings > Secrets and variables > Actions > Variables):
+#     SUPABASE_URL       e.g. https://abcd1234.supabase.co
+#     SUPABASE_ANON_KEY  the project's anon/public key (public by design; RLS protects data)
+#   Never put the service role key, Anthropic key or encryption key here. Those live
+#   only in Supabase Edge Function secrets.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit, privacy (RLS) and function tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build static site
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          npm run build
+          touch out/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

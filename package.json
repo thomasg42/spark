@@ -1,0 +1,43 @@
+{
+  "name": "spark",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Spark (working name): a private two-person app that helps a couple stay connected for the long term.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "npx serve out",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:privacy": "vitest run tests/db",
+    "check:functions": "bash scripts/check-functions.sh",
+    "seed": "tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.117.2",
+    "next": "16.3.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@tailwindcss/postcss": "4.3.3",
+    "@testing-library/dom": "latest",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "jsdom": "latest",
+    "postcss": "latest",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.0.3"
+  }
+}
