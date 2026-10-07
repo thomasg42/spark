@@ -17,7 +17,7 @@ const personas = [
 /** Two demo accounts, no profiles, no couple: walk through pairing from scratch. */
 export function freshState(): DemoState {
   return {
-    version: 3,
+    version: 4,
     signedIn: false,
     actingAs: DEMO_ALEX,
     personas,
@@ -31,6 +31,11 @@ export function freshState(): DemoState {
     activities: [],
     ideas: [],
     moments: [],
+    buddyShares: {},
+    buddyChats: {},
+    datePlans: [],
+    projects: [],
+    money: [],
   };
 }
 
@@ -58,7 +63,7 @@ export function buildSeed(today: Date): DemoState {
     }));
 
   return {
-    version: 3,
+    version: 4,
     signedIn: true,
     actingAs: DEMO_ALEX,
     personas,
@@ -141,6 +146,11 @@ export function buildSeed(today: Date): DemoState {
       [DEMO_SAM]: [
         { questionId: "what_attracted_you", section: "beginnings", value: "Alex was kind to the bartender when it got busy.", skipped: false, updatedAt: at(-19) },
         { questionId: "trust_level", section: "closeness_trust", value: 4, skipped: false, updatedAt: at(-19) },
+        { questionId: "love_language", section: "roots", value: ["time", "words"], skipped: false, updatedAt: at(-6) },
+        { questionId: "conflict_tendency", section: "attachment", value: "pull_away", skipped: false, updatedAt: at(-6) },
+        { questionId: "feel_close_when", section: "closeness_trust", value: "When Alex puts the phone away and we just talk, no plans, no rush.", skipped: false, updatedAt: at(-6) },
+        { questionId: "trust_hurts", section: "closeness_trust", value: "When plans with me get cancelled for work again and again, I start to feel like an afterthought.", skipped: false, updatedAt: at(-6) },
+        { questionId: "leave_behind", section: "roots", value: "Private sample answer that Sam kept off the table.", skipped: false, updatedAt: at(-6) },
       ],
     },
     pulses: [
@@ -162,14 +172,14 @@ export function buildSeed(today: Date): DemoState {
           [DEMO_SAM]: {
             best: "Hot springs, obviously.",
             closest: "The long drive home talking about everything.",
-            distant: "Not really.",
-            more_of: "Trying new restaurants.",
+            distant: "When our plans kept getting moved for work.",
+            more_of: "Date nights that are just us, no phones.",
             talk_about: "Spring trip ideas!",
           },
         },
         summary: {
           overlaps: ["You both named the hot springs weekend as the best part of the month.", "You're both excited to plan a spring trip."],
-          gaps: ["Alex felt a bit distant during a busy work week; Sam didn't notice it. Worth a gentle check-in."],
+          gaps: ["You both felt a little distant when work got busy. Sam would love more date nights that are just the two of you."],
           conversationStarter: "What would make a busy week feel more connected for each of you?",
           safetyFlag: false,
           source: "fallback",
@@ -191,6 +201,32 @@ export function buildSeed(today: Date): DemoState {
       { id: "seed-moment-1", authorId: DEMO_SAM, kind: "photo", caption: "This sunset was showing off for you", mediaPath: "demo/inline/sunset.svg", mediaMime: "image/svg+xml", linkUrl: null, createdAt: at(-1, 19), reactions: { [DEMO_ALEX]: "heart" } },
       { id: "seed-moment-2", authorId: DEMO_ALEX, kind: "link", caption: "This is literally us trying to parallel park", mediaPath: null, mediaMime: null, linkUrl: "https://example.com/parallel-parking-fails", createdAt: at(-2, 12), reactions: { [DEMO_SAM]: "laugh" } },
       { id: "seed-moment-3", authorId: DEMO_SAM, kind: "note", caption: "Saw a dog that looked exactly like your mom's dog. Same attitude.", mediaPath: null, mediaMime: null, linkUrl: null, createdAt: at(-4, 15), reactions: {} },
+    ],
+    // What Sam chose to let their Buddy pass on. "leave_behind" stays off the table, so it has no share.
+    buddyShares: {
+      [DEMO_SAM]: [
+        { questionId: "love_language", level: "open", text: "Kind words and hearing it out loud; Quality time, just us", updatedAt: at(-6) },
+        { questionId: "conflict_tendency", level: "open", text: "Pull away to think", updatedAt: at(-6) },
+        { questionId: "feel_close_when", level: "hint", text: "Unhurried evenings with phones put away go a long way with them.", updatedAt: at(-6) },
+        { questionId: "trust_hurts", level: "hint", text: "Plans that keep getting moved can make them feel like an afterthought. Protecting time together matters.", updatedAt: at(-6) },
+      ],
+      [DEMO_ALEX]: [],
+    },
+    buddyChats: {},
+    datePlans: [],
+    projects: [
+      { id: "seed-project-1", title: "Paint the baby's room (pick the right color first)", kind: "family", status: "active", rank: 1, targetDate: day(30), budgetCents: 25000, note: "Order three sample pots and test them on the wall in daylight.", createdBy: DEMO_SAM, createdAt: at(-14), updatedAt: at(-2) },
+      { id: "seed-project-2", title: "Finish the garage", kind: "home", status: "active", rank: 2, targetDate: day(60), budgetCents: 120000, note: null, createdBy: DEMO_ALEX, createdAt: at(-13), updatedAt: at(-13) },
+      { id: "seed-project-3", title: "Build up our income and essentials fund", kind: "money", status: "planned", rank: 3, targetDate: null, budgetCents: null, note: "Three months of essentials first.", createdBy: DEMO_ALEX, createdAt: at(-12), updatedAt: at(-12) },
+      { id: "seed-project-4", title: "Remodel the living room", kind: "home", status: "planned", rank: 4, targetDate: null, budgetCents: 400000, note: null, createdBy: DEMO_SAM, createdAt: at(-11), updatedAt: at(-11) },
+      { id: "seed-project-5", title: "Save up for a vacation", kind: "trip", status: "planned", rank: 5, targetDate: day(240), budgetCents: 300000, note: null, createdBy: DEMO_SAM, createdAt: at(-10), updatedAt: at(-10) },
+    ],
+    money: [
+      { id: "seed-goal-joint-1", ownerId: DEMO_SAM, scope: "joint", title: "Vacation fund", savedCents: 82000, targetCents: 300000, targetDate: day(240), visibleToPartner: true, createdAt: at(-10), updatedAt: at(-1) },
+      { id: "seed-goal-joint-2", ownerId: DEMO_ALEX, scope: "joint", title: "Essentials cushion", savedCents: 410000, targetCents: 900000, targetDate: null, visibleToPartner: true, createdAt: at(-12), updatedAt: at(-3) },
+      { id: "seed-goal-alex-1", ownerId: DEMO_ALEX, scope: "mine", title: "My savings", savedCents: 265000, targetCents: null, targetDate: null, visibleToPartner: false, createdAt: at(-30), updatedAt: at(-4) },
+      { id: "seed-goal-sam-1", ownerId: DEMO_SAM, scope: "mine", title: "New camera", savedCents: 34000, targetCents: 90000, targetDate: day(120), visibleToPartner: true, createdAt: at(-20), updatedAt: at(-5) },
+      { id: "seed-goal-sam-2", ownerId: DEMO_SAM, scope: "mine", title: "Private sample goal Sam keeps to themself", savedCents: 50000, targetCents: null, targetDate: null, visibleToPartner: false, createdAt: at(-20), updatedAt: at(-5) },
     ],
   };
 }

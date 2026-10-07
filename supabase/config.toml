@@ -48,3 +48,6 @@ verify_jwt = true
 
 [functions.date-ideas]
 verify_jwt = true
+
+[functions.buddy]
+verify_jwt = true

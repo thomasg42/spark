@@ -23,7 +23,7 @@ describe("demo private answers", () => {
     actAs(DEMO_SAM);
     const all = await answers.list();
     const beginnings = await answers.list("beginnings");
-    expect(all.map((a) => a.questionId).sort()).toEqual(["trust_level", "what_attracted_you"]);
+    expect(all.map((a) => a.questionId).sort()).toEqual(["conflict_tendency", "feel_close_when", "leave_behind", "love_language", "trust_hurts", "trust_level", "what_attracted_you"]);
     const seen = JSON.stringify([all, beginnings]);
     for (const a of alexSeed) expect(seen).not.toContain(String(a.value));
     expect(seen).not.toContain("Trivia night");
@@ -38,13 +38,13 @@ describe("demo private answers", () => {
 
   it("a new answer from Alex stays invisible to Sam", async () => {
     actAs(DEMO_ALEX);
-    await answers.save("trust_hurts", "When plans change and I hear about it last.");
+    await answers.save("trust_one_thing", "When plans change and I hear about it last.");
     actAs(DEMO_SAM);
     const samView = await answers.list();
-    expect(samView.find((a) => a.questionId === "trust_hurts")).toBeUndefined();
+    expect(samView.find((a) => a.questionId === "trust_one_thing")).toBeUndefined();
     expect(JSON.stringify(samView)).not.toContain("hear about it last");
     actAs(DEMO_ALEX);
-    expect((await answers.list()).find((a) => a.questionId === "trust_hurts")?.value).toBe("When plans change and I hear about it last.");
+    expect((await answers.list()).find((a) => a.questionId === "trust_one_thing")?.value).toBe("When plans change and I hear about it last.");
   });
 
   it("Sam clearing or skipping a question never touches Alex's answer to the same question", async () => {

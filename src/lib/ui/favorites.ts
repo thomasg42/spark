@@ -1,9 +1,13 @@
 /**
  * Home-screen favorites: the shortcuts each person keeps on their home page.
  * Tab destinations (Moments, Check-in, Plans, Us) are deliberately NOT offered,
- * because the bottom bar already reaches them. Saved per person on this device.
+ * because the bottom bar already reaches them. Screens one level down (Spark
+ * Buddy, Projects, Money) are, since they take an extra tap otherwise. Saved per person on this device.
  */
 export const FAVORITE_CATALOG = [
+  { id: "buddy", href: "/us/buddy/", icon: "✦", title: "Spark Buddy" },
+  { id: "projects", href: "/plans/projects/", icon: "🔨", title: "Projects" },
+  { id: "money", href: "/plans/money/", icon: "💵", title: "Money" },
   { id: "ideas", href: "/plans/ideas/", icon: "💡", title: "Date ideas" },
   { id: "pulse", href: "/checkin/pulse/", icon: "💓", title: "Quick check-in" },
   { id: "monthly", href: "/checkin/monthly/", icon: "🗓️", title: "Monthly check-in" },
@@ -15,7 +19,7 @@ export const FAVORITE_CATALOG = [
 ] as const;
 
 export type FavoriteId = (typeof FAVORITE_CATALOG)[number]["id"];
-export const DEFAULT_FAVORITES: FavoriteId[] = ["ideas", "notes", "story", "questions"];
+export const DEFAULT_FAVORITES: FavoriteId[] = ["buddy", "projects", "ideas", "notes", "story", "questions"];
 
 const key = (userId: string) => `spark-favorites:${userId}`;
 const isFavoriteId = (v: unknown): v is FavoriteId => typeof v === "string" && FAVORITE_CATALOG.some((f) => f.id === v);

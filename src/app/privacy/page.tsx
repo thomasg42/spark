@@ -3,7 +3,11 @@ import { Card, PageHeader } from "@/components/ui";
 export const metadata = { title: "What's private" };
 
 const ROWS = [
-  { what: "Your onboarding answers", who: "Only you. Never shown to your partner in any form.", how: "Encrypted before they're saved." },
+  { what: "Your onboarding answers", who: "Only you, unless you choose to share one through Spark Buddy.", how: "Encrypted before they're saved. Every answer starts off the table." },
+  { what: "What you let Spark Buddy share", who: "Your partner's Buddy, and only the items you marked Hint (your approved words) or Open.", how: "Encrypted. Change or stop sharing any item at any time." },
+  { what: "Your chat with Spark Buddy", who: "Only you. Your partner can't see it, and their Buddy can't either.", how: "Encrypted before it's saved. Clear it any time." },
+  { what: "Projects, the shared calendar, joint savings goals", who: "The two of you.", how: "Either of you can add or update them." },
+  { what: "Your own savings goals", who: "Only you, unless you turn on “Let my partner see this” (they still can't change it).", how: "Spark never connects to your bank." },
   { what: "Monthly check-in answers and pace votes", who: "Only you until you both submit, then both of you.", how: "Encrypted. Revealed side by side." },
   { what: "Quick check-in scores", who: "Only you until you both submit for that week.", how: "Shown as a shared trend, never as blame." },
   { what: "Our Story, Moments, notes, activities, date ideas", who: "The two of you.", how: "Photos and clips live in a private folder only you two can open." },
@@ -37,7 +41,8 @@ export default function PrivacyPage() {
           <ul className="mt-2 list-disc space-y-1 pl-5 text-ink">
             <li>Date ideas: your city and the titles, categories and ratings of past activities are sent to Claude to suggest new ideas.</li>
             <li>Monthly check-in summary: after you both submit, both sets of check-in answers are sent to Claude for a short, kind summary of overlaps and gaps.</li>
-            <li>Your private onboarding answers are never sent to AI.</li>
+            <li>Spark Buddy: AI is off until you turn it on. When it's on, what you tell your Buddy, your own answers and plans, and the items your partner chose to share are sent to Claude so it can reply. Your partner's off-the-table answers never are.</li>
+            <li>With AI off (the default), your private onboarding answers are never sent to AI.</li>
           </ul>
         </Card>
         <Card>

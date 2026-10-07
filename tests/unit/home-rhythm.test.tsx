@@ -96,7 +96,7 @@ describe("home screen", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /Our Story/ }));
     await waitFor(() => expect(screen.getByRole("link", { name: /Monthly check-in/ }).getAttribute("href")).toBe("/checkin/monthly/"));
     expect(screen.queryByRole("link", { name: /Our Story/ })).toBeNull();
-    expect(JSON.parse(localStorage.getItem(`spark-favorites:${DEMO_ALEX}`)!)).toEqual(["ideas", "monthly", "notes", "questions"]);
+    expect(JSON.parse(localStorage.getItem(`spark-favorites:${DEMO_ALEX}`)!)).toEqual(["buddy", "projects", "ideas", "monthly", "notes", "questions"]);
   });
 });
 

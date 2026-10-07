@@ -2,6 +2,16 @@ import { findQuestion, validateAnswer, type AnswerValue } from "@shared/question
 import { UserFacingError, type Backend, type SavedAnswer } from "../types";
 import { invoke, requireUserId } from "./client";
 
+/** A cleared or skipped answer must stop being shared with the partner's Buddy too. */
+async function unshare(questionId: string) {
+  try {
+    await invoke<{ ok: true }>("buddy", { action: "unshare", questionId });
+  } catch (error) {
+    // Not paired yet means nothing could have been shared.
+    if (!(error instanceof UserFacingError && /pair with your partner/i.test(error.message))) throw error;
+  }
+}
+
 /**
  * Private onboarding answers. Everything goes through the "answers" Edge Function,
  * which encrypts before saving and decrypts only the caller's own rows (RLS is
@@ -37,10 +47,12 @@ export const answers: Backend["answers"] = {
     await requireUserId();
     question(questionId);
     const { answer } = await invoke<{ answer: SavedAnswer }>("answers", { action: "skip", questionId });
+    await unshare(questionId);
     return answer;
   },
   async clear(questionId) {
     await requireUserId();
     await invoke<{ ok: true }>("answers", { action: "clear", questionId });
+    await unshare(questionId);
   },
 };

@@ -2,6 +2,14 @@ import { findQuestion, findSection, validateAnswer, type AnswerValue } from "@sh
 import { UserFacingError, type Backend, type SavedAnswer } from "../types";
 import { demoStore, me, nowIso, tick } from "./store";
 
+/** A cleared or skipped answer stops being shared with the partner's Buddy too. */
+function unshareDemo(userId: string, questionId: string) {
+  if (!(demoStore.get().buddyShares[userId] ?? []).some((x) => x.questionId === questionId)) return;
+  demoStore.update((s) => {
+    s.buddyShares[userId] = (s.buddyShares[userId] ?? []).filter((x) => x.questionId !== questionId);
+  });
+}
+
 /**
  * Demo private answers: kept per user in this browser only (sample data, never
  * sent anywhere). Enforces the same rule as the database: every call reads and
@@ -51,7 +59,9 @@ export const answers: Backend["answers"] = {
     await tick();
     const uid = me();
     const { section } = known(questionId);
-    return upsert(uid, { questionId, section: section.key, value: null, skipped: true, updatedAt: nowIso() });
+    const saved = upsert(uid, { questionId, section: section.key, value: null, skipped: true, updatedAt: nowIso() });
+    unshareDemo(uid, questionId);
+    return saved;
   },
   async clear(questionId) {
     await tick();
@@ -60,5 +70,6 @@ export const answers: Backend["answers"] = {
       const list = s.answers[uid];
       if (list) s.answers[uid] = list.filter((a) => a.questionId !== questionId);
     });
+    unshareDemo(uid, questionId);
   },
 };

@@ -13,8 +13,10 @@ import type { ISODate } from "@/lib/domain/dates";
 import type { SocialLevel } from "@/lib/domain/social";
 import type { AnswerValue } from "@shared/questionnaires.ts";
 import type { CheckinAnswers, CheckinSummary } from "@shared/checkin-questions.ts";
+import type { BuddyClientContext, BuddyReply, BuddyShare, BuddyTurn, ShareLevel } from "@shared/buddy.ts";
 
 export type { Cadence, PickableCadence, ActivityCategory, StoryKind, ISODate, SocialLevel, AnswerValue, CheckinAnswers, CheckinSummary };
+export type { BuddyClientContext, BuddyReply, BuddyShare, BuddyTurn, ShareLevel };
 
 export type AccentTheme = "rose" | "plum" | "ocean" | "sunset" | "forest";
 export type ColorMode = "system" | "light" | "dark";
@@ -181,6 +183,98 @@ export type MomentInput =
   | { kind: "link"; url: string; caption?: string | null }
   | { kind: "note"; caption: string };
 
+/** A day on the couple's shared calendar (date nights and plans, usually made with Spark Buddy). */
+export interface DatePlan {
+  id: string;
+  title: string;
+  plannedFor: ISODate;
+  time: string | null; // HH:MM
+  note: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface DatePlanInput {
+  title: string;
+  plannedFor: ISODate;
+  time?: string | null;
+  note?: string | null;
+}
+
+export type ProjectKind = "home" | "family" | "money" | "trip" | "other";
+export type ProjectStatus = "planned" | "active" | "done";
+
+/** A shared couple project, ranked 1..N so you both agree on what comes first. */
+export interface Project {
+  id: string;
+  title: string;
+  kind: ProjectKind;
+  status: ProjectStatus;
+  rank: number; // 1 = top priority
+  targetDate: ISODate | null;
+  budgetCents: number | null;
+  note: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectInput {
+  title: string;
+  kind: ProjectKind;
+  status?: ProjectStatus;
+  targetDate?: ISODate | null;
+  budgetCents?: number | null;
+  note?: string | null;
+}
+
+/**
+ * A savings goal. "joint" goals belong to both partners. "mine" goals belong to
+ * one person and the partner sees them only when their owner turns on
+ * visibleToPartner.
+ */
+export type MoneyScope = "mine" | "joint";
+
+export interface MoneyGoal {
+  id: string;
+  ownerId: string | null; // the creator; for "mine" goals, the only person who can change it
+  scope: MoneyScope;
+  title: string;
+  savedCents: number;
+  targetCents: number | null;
+  targetDate: ISODate | null;
+  visibleToPartner: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MoneyGoalInput {
+  scope: MoneyScope;
+  title: string;
+  savedCents?: number;
+  targetCents?: number | null;
+  targetDate?: ISODate | null;
+  visibleToPartner?: boolean;
+}
+
+export interface BuddySendInput {
+  text: string;
+  /** The onboarding question the interview is asking right now, if any. */
+  interviewQuestionId: string | null;
+  context: BuddyClientContext;
+  /**
+   * The person turned on AI for their Buddy on this device. Without it, nothing
+   * they say or answered is sent to Claude: Buddy uses its built-in guide.
+   */
+  aiConsent: boolean;
+}
+
+export interface BuddySendResult {
+  reply: BuddyReply;
+  /** Plain-language note when Buddy used its built-in guide instead of Claude. */
+  notice: string | null;
+}
+
 export interface DemoControls {
   personas: Array<{ id: string; name: string }>;
   actingAs(): string;
@@ -280,6 +374,50 @@ export interface Backend {
     add(input: MomentInput): Promise<Moment>;
     react(momentId: string, reaction: Reaction | null): Promise<void>;
     remove(momentId: string): Promise<void>;
+  };
+
+  /**
+   * Spark Buddy. The partner's answers reach a Buddy ONLY through shares their
+   * author marked hint or open; nothing off the table is ever returned or stored
+   * where the partner's side can read it. Conversations are private to each person.
+   */
+  buddy: {
+    history(): Promise<BuddyTurn[]>;
+    send(input: BuddySendInput): Promise<BuddySendResult>;
+    /** The signed-in person's own shares (what their partner's Buddy may see). */
+    shares(): Promise<BuddyShare[]>;
+    /** "private" removes the share; "hint" needs the approved hint text. */
+    share(questionId: string, level: ShareLevel, hint?: string | null): Promise<BuddyShare | null>;
+    /** With aiConsent, Claude drafts the hint; otherwise Spark's built-in wording. */
+    draftHint(questionId: string, aiConsent?: boolean): Promise<{ hint: string; source: "claude" | "fallback" }>;
+    clear(): Promise<void>;
+  };
+
+  datePlans: {
+    /** Upcoming and recent plans, soonest first. */
+    list(): Promise<DatePlan[]>;
+    add(input: DatePlanInput): Promise<DatePlan>;
+    remove(id: string): Promise<void>;
+  };
+
+  projects: {
+    /** The couple's projects, top priority first. */
+    list(): Promise<Project[]>;
+    add(input: ProjectInput): Promise<Project>;
+    update(id: string, patch: Partial<ProjectInput>): Promise<Project>;
+    /** Moves a project one place up or down the priority list. */
+    move(id: string, direction: "up" | "down"): Promise<Project[]>;
+    remove(id: string): Promise<void>;
+  };
+
+  money: {
+    /** Joint goals, your own goals, and your partner's goals they made visible. */
+    list(): Promise<MoneyGoal[]>;
+    add(input: MoneyGoalInput): Promise<MoneyGoal>;
+    update(id: string, patch: Partial<Omit<MoneyGoalInput, "scope">>): Promise<MoneyGoal>;
+    /** Adds (or, with a negative amount, takes out) money saved toward a goal. */
+    addSaved(id: string, cents: number): Promise<MoneyGoal>;
+    remove(id: string): Promise<void>;
   };
 }
 

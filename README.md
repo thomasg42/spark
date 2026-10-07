@@ -29,6 +29,7 @@ Browser (Next.js static export on GitHub Pages)
        answers     encrypt/decrypt private onboarding answers
        checkins    monthly check-in submit, reveal, AI summary (Claude)
        date-ideas  five new date ideas (Claude) with a non-AI fallback
+       buddy       Spark Buddy: chat, interview, go-between, opt-in shares (Claude only with consent)
 ```
 
 - GitHub Pages serves static files only, so everything secret lives in Edge Function secrets: `ENCRYPTION_KEY`, `ANTHROPIC_API_KEY`. Nothing secret is in the browser bundle.
@@ -36,6 +37,15 @@ Browser (Next.js static export on GitHub Pages)
 - Claude model: `claude-sonnet-5-5`, structured JSON output, server-side refusal fallback enabled. Only the minimum data is sent (see the in-app "What's private" page).
 - Encryption: AES-256-GCM with per-scope keys derived by HKDF from `ENCRYPTION_KEY` (`user:<id>` for private answers, `couple:<id>` for check-ins). Each ciphertext is bound to its row with associated data. The database rejects anything without the `v1.` ciphertext prefix.
 - **Demo mode:** when `SUPABASE_URL`/`SUPABASE_ANON_KEY` are empty at build time, the app runs entirely in the browser with a fictional couple (Alex and Sam) and the same privacy rules. The public preview uses this.
+
+## Spark Buddy, Projects and Money (2026-10-06, Thomas's request)
+
+- **Spark Buddy** (`/us/buddy/`): each partner's private helper. It interviews you (20 starter questions, starting with the new "Where you come from" set: how you were raised, siblings, hometown, love language), fills each answer in from what you say or type (mic button where the browser supports it), and after each answer asks "Do you trust this to your Spark Buddy?". It coaches you about the relationship, reads your astrology and numbers, and proposes actions as cards you confirm: save an answer, put a date night on the shared calendar, send a note, add a project, record savings.
+- **Go-between privacy model** (`supabase/functions/_shared/buddy.ts`): every answer has a level. *Off the table* (default) has no share row at all. *Hint* stores only words the author approved. *Open* stores the answer as the author saw it, and the sharing screen flags it when the answer later changes. The partner's Buddy only ever receives these shares plus data both already see (revealed check-ins, shared pulses, activities, calendar, projects, joint goals, goals made visible). Clearing or skipping an answer removes its share.
+- **AI consent:** Buddy uses Claude only when the person turns AI on (asked once per device; enforced again on the server). With AI off, or with no key, Buddy runs its built-in rule-based guide, so the "never sent to AI" promise stays true by default. Crisis language always goes straight to resources, never to the model.
+- **Projects** (`/plans/projects/`): one shared list ranked 1..N (move up/down, status, budget). **Money** (`/plans/money/`): savings goals, joint (both see and update) or yours (only you, unless you let your partner see it, read-only). Spark never connects to a bank.
+- **Our stars & numbers** (`/us/stars/`): Sun sign, Chinese zodiac, Life Path and Personal Year for both partners, with couple strengths, watch-outs and "keep it from getting old" ideas. Computed deterministically (`_shared/astro.ts`); framed as a lens, not a prediction. Moon and Rising are not computed yet.
+- **Migrations:** `20261006000300_spark_buddy.sql` (buddy_shares, buddy_messages, date_plans) and `20261006000400_spark_projects_money.sql` (projects + `move_project`, money_goals). Both are covered by `tests/db/buddy-projects-money.test.ts`.
 
 ## Project layout
 
@@ -78,6 +88,7 @@ npm run build        # static export into out/
    npx supabase functions deploy answers
    npx supabase functions deploy checkins
    npx supabase functions deploy date-ideas
+   npx supabase functions deploy buddy
    ```
    Back up `ENCRYPTION_KEY` in a password manager. Losing it makes existing encrypted answers unreadable.
 5. Auth settings (Dashboard > Authentication > URL Configuration): Site URL `https://<user>.github.io/spark/`, and add redirect URLs `https://<user>.github.io/spark/auth/callback/` and `http://localhost:3000/auth/callback/`.
@@ -95,6 +106,8 @@ npm run build        # static export into out/
 | `tests/unit/triggers.test.ts` | Rhythm trigger logic: category rut, excitement dropping two weeks running, little time together, life change, and the supportive suggestions they map to. |
 | `tests/unit/crypto.test.ts` | Encryption round trip, fresh IVs, wrong scope/row/key rejected, tamper detection, no plaintext in errors. |
 | `tests/unit/domain.test.ts` | Dates and anniversaries, social agreement (always the more private choice), WCAG AA contrast for every theme, crisis detection, questionnaire rules. |
+| `tests/db/buddy-projects-money.test.ts` | Buddy shares readable by the partner only and never writable by them, no "private" share level exists, conversations owner-only, shared calendar and projects couple-only, `move_project` ordering, private savings goals invisible unless shared and never editable by the partner, goal owner/type frozen. |
+| `tests/unit/buddy.test.ts`, `tests/functions/buddy.test.ts`, `tests/unit/buddy-demo.test.ts`, `tests/unit/buddy-screens.test.tsx` | Astrology/numerology math, interview answer interpretation, go-between replies built only from shares, action validation, Claude only with consent, crisis bypass, encrypted chat, the demo scenario end to end, and the screens. |
 | `tests/functions/*` and module tests | Edge Function handlers with a fake Claude: encryption on save, reveal rules, summary once, fallback paths, five non-repeating date ideas, rate limits. |
 
 ## Publish to GitHub Pages

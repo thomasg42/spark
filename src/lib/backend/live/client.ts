@@ -52,7 +52,7 @@ export function fail(error: PostgrestError | null, fallback: string): never {
 }
 
 /** Calls an Edge Function as the signed-in user and returns its JSON body. */
-export async function invoke<T>(fn: "answers" | "checkins" | "date-ideas", body: Record<string, unknown>): Promise<T> {
+export async function invoke<T>(fn: "answers" | "checkins" | "date-ideas" | "buddy", body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase().functions.invoke(fn, { body });
   if (error) {
     if (error instanceof FunctionsHttpError) {

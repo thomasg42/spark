@@ -6,6 +6,8 @@ import { RequireStage } from "@/components/require-stage";
 import { Button, PageHeader } from "@/components/ui";
 
 const LINKS = [
+  { href: "/us/buddy/", emoji: "✦", title: "Talk to your Spark Buddy", body: "Your private helper: fills in your answers, coaches you, plans dates." },
+  { href: "/us/stars/", emoji: "♌", title: "Our stars & numbers", body: "Astrology and numerology for you two: what to lean into and watch for." },
   { href: "/us/story/", emoji: "📖", title: "Our Story", body: "Your shared timeline: how you met, firsts, trips, anniversaries." },
   { href: "/us/questions/", emoji: "🌱", title: "Questions", body: "Short private sets about you. Only you see your answers." },
   { href: "/us/agreements/", emoji: "🤝", title: "Agreements", body: "Check-in rhythm and social media, with both choices shown." },

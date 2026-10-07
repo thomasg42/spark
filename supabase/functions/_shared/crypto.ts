@@ -6,7 +6,8 @@
  *   secret, which lives only in Edge Function secrets (never in the database,
  *   never in the browser bundle):
  *     user:<uuid>    private onboarding answers (only that user can ever unlock)
- *     couple:<uuid>  monthly check-in answers and summaries (both partners, after reveal)
+ *     couple:<uuid>  monthly check-in answers and summaries (both partners, after reveal),
+ *                    and Spark Buddy shares (only what the author marked hint or open)
  * - Associated data binds each ciphertext to its row, so a value copied into a
  *   different row or column fails to decrypt instead of leaking.
  * - Format: "v1.<base64url iv>.<base64url ciphertext+tag>". The database CHECK
@@ -125,6 +126,8 @@ export const aad = {
   privateAnswer: (userId: string, questionId: string) => `private_answers|${userId}|${questionId}`,
   checkinResponse: (checkinId: string, userId: string) => `checkin_responses|${checkinId}|${userId}`,
   checkinSummary: (checkinId: string) => `checkins.summary|${checkinId}`,
+  buddyShare: (ownerId: string, questionId: string) => `buddy_shares|${ownerId}|${questionId}`,
+  buddyMessage: (userId: string, messageId: string) => `buddy_messages|${userId}|${messageId}`,
 };
 
 export const scopes = {

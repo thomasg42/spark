@@ -8,6 +8,52 @@ import { CATEGORY_COPY, ACTIVITY_CATEGORIES, type ActivityCategory } from "@/lib
 import { formatDate } from "@/lib/domain/dates";
 import { useAction, useLoad } from "@/lib/ui/hooks";
 import type { Activity } from "@/lib/backend/types";
+import { DrillList, DrillRow } from "@/components/drill-row";
+import { formatMoney } from "@/lib/domain/plans-rules";
+
+/** Projects, Money and the shared calendar, above the activity log. */
+function PlansHub() {
+  const { backend, user, nameOf } = useApp();
+  const toast = useToast();
+  const data = useLoad(async () => {
+    const [projects, money, plans] = await Promise.all([backend.projects.list(), backend.money.list(), backend.datePlans.list()]);
+    return { projects, money, plans };
+  }, [backend, user?.id]);
+  const open = data.data?.projects.filter((p) => p.status !== "done") ?? [];
+  const joint = data.data?.money.filter((g) => g.scope === "joint") ?? [];
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = (data.data?.plans ?? []).filter((p) => p.plannedFor >= today).slice(0, 4);
+  return (
+    <div className="mb-6">
+      <DrillList label="Plans">
+        <li>
+          <DrillRow href="/plans/projects/" icon="🔨" title="Projects" status={open.length ? `1. ${open[0]!.title}${open.length > 1 ? ` · ${open.length - 1} more` : ""}` : "What you're working on, in priority order"} />
+        </li>
+        <li>
+          <DrillRow href="/plans/money/" icon="💵" title="Money" status={joint.length ? `${formatMoney(joint.reduce((n, g) => n + g.savedCents, 0))} saved together` : "Savings goals, yours and joint"} />
+        </li>
+      </DrillList>
+      {upcoming.length ? (
+        <Card className="mt-4" aria-labelledby="calendar-title">
+          <h2 id="calendar-title" className="text-lg font-bold text-ink">On the calendar</h2>
+          <ul className="mt-2 divide-y divide-line">
+            {upcoming.map((p) => (
+              <li key={p.id} className="flex min-h-12 items-center justify-between gap-3 py-2">
+                <span>
+                  <span className="block font-semibold text-ink">{p.title}</span>
+                  <span className="text-sm text-muted">{formatDate(p.plannedFor)}{p.time ? ` · ${p.time}` : ""} · added by {nameOf(p.createdBy)}</span>
+                </span>
+                {p.createdBy === user?.id ? (
+                  <Button variant="ghost" className="min-h-11 text-sm" onClick={async () => { try { await backend.datePlans.remove(p.id); await data.reload(); toast.show("Removed from the calendar."); } catch (e) { toast.show(e instanceof Error ? e.message : "Could not remove it.", "error"); } }}>Remove</Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+    </div>
+  );
+}
 
 function Rating({ activity, mine, userId, partnerName, onRate, pending }: { activity: Activity; mine: number | undefined; userId: string | undefined; partnerName: string; onRate(value: number): void; pending: boolean }) {
   return (
@@ -40,6 +86,7 @@ export function PlansScreen() {
     <>
       <PageHeader title="Plans" subtitle="Keep the good things visible and make room for the next one." action={<Link href="/plans/ideas/" className="inline-flex min-h-11 items-center rounded-full bg-accent px-4 font-semibold text-accent-ink">Ideas</Link>} />
       <div className="mb-5 overflow-x-auto pb-1"><ChoiceGroup legend="Filter activities" options={[{ value: "all", label: "All" }, ...ACTIVITY_CATEGORIES.map((value) => ({ value, label: CATEGORY_COPY[value].label }))]} value={category} onChange={setCategory as (value: string) => void} columns={2} name="activity-filter" /></div>
+      <PlansHub />
       <Link href="/plans/new/" className="mb-5 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent px-5 font-semibold text-accent-ink">Log an activity</Link>
       {list.error ? <Notice tone="danger" title={list.error} /> : null}
       {rate.error ? <Notice tone="danger" className="mb-3" title={rate.error} /> : null}

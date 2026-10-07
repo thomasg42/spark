@@ -1,9 +1,10 @@
 /**
  * Module B: onboarding questionnaires (month 1, light and laid-back).
  *
- * Every answer is PRIVATE: only the person who wrote it can ever read it. In
- * Phase 1 nothing from these answers is shown to the partner in any form. Phase 3
- * adds opt-in hints that the answerer writes and approves.
+ * Every answer is PRIVATE: only the person who wrote it can ever read it. Nothing
+ * reaches the partner unless its author opts in through Spark Buddy sharing
+ * (buddy.ts): "Off the table" (the default) shares nothing, "Hint" shares only a
+ * hint the author approved, "Open" shares the answer as the author last saw it.
  *
  * Each section is split into short sittings (5 to 8 questions), progress saves
  * after every answer, and every question can be skipped.
@@ -63,6 +64,87 @@ const o = (value: string, label: string): Option => ({ value, label });
 export const TEXT_ANSWER_MAX = 2000;
 
 export const SECTIONS: Section[] = [
+  {
+    key: "roots",
+    title: "Where you come from",
+    emoji: "🏠",
+    blurb: "How you were raised and what feels like love to you. It explains a lot.",
+    phase: 1,
+    sittings: [
+      {
+        id: "roots_1",
+        title: "Growing up",
+        questions: [
+          {
+            id: "raised_by",
+            kind: "single",
+            prompt: "Who raised you, mostly?",
+            options: [
+              o("both_parents", "Both parents, together"),
+              o("single_parent", "One parent"),
+              o("blended", "A blended family or step-parent"),
+              o("family", "Grandparents or other family"),
+              o("other", "Something else"),
+            ],
+          },
+          {
+            id: "siblings",
+            kind: "single",
+            prompt: "How many brothers and sisters did you grow up with?",
+            options: [o("none", "None, I'm an only child"), o("one", "One"), o("two", "Two"), o("three_plus", "Three or more")],
+          },
+          {
+            id: "birth_order",
+            kind: "single",
+            prompt: "Where did you land in the line-up?",
+            options: [o("oldest", "Oldest"), o("middle", "Somewhere in the middle"), o("youngest", "Youngest"), o("only", "Only child"), o("twin", "Twin")],
+          },
+          { id: "hometown", kind: "text", prompt: "Where did you grow up?", placeholder: "Town, state, country, or a few places…" },
+          { id: "home_felt_like", kind: "text", prompt: "What did home feel like growing up?", placeholder: "Loud, calm, tight-knit, complicated…", long: true },
+        ],
+      },
+      {
+        id: "roots_2",
+        title: "What you carry",
+        questions: [
+          { id: "family_close", kind: "scale", prompt: "How close are you with your family today?", minLabel: "Distant", maxLabel: "Very close" },
+          {
+            id: "conflict_growing_up",
+            kind: "single",
+            prompt: "When there was conflict at home growing up, it usually…",
+            options: [
+              o("talked", "Got talked through"),
+              o("loud", "Got loud, then blew over"),
+              o("quiet", "Went quiet or got swept under the rug"),
+              o("left", "Ended with someone leaving the room or the house"),
+              o("rare", "I rarely saw any conflict"),
+            ],
+          },
+          {
+            id: "love_language",
+            kind: "multi",
+            prompt: "How do you feel most loved?",
+            max: 2,
+            options: [
+              o("words", "Kind words and hearing it out loud"),
+              o("time", "Quality time, just us"),
+              o("touch", "Touch and closeness"),
+              o("gifts", "Thoughtful little gifts"),
+              o("acts", "Things done to make my life easier"),
+            ],
+          },
+          { id: "carry_forward", kind: "text", prompt: "Something from how you were raised that you want to bring into us." },
+          {
+            id: "leave_behind",
+            kind: "text",
+            prompt: "Something from growing up you'd rather leave behind.",
+            help: "Answer only as much as you want. Skipping is completely fine.",
+            optional: true,
+          },
+        ],
+      },
+    ],
+  },
   {
     key: "beginnings",
     title: "Beginnings",

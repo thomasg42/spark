@@ -112,8 +112,8 @@ describe("questionnaires", () => {
       expect(section.key).toMatch(/^[a-z_]{2,40}$/);
     }
   });
-  it("covers the four Phase 1 sections", () => {
-    expect(SECTIONS.map((s) => s.key)).toEqual(["beginnings", "closeness_trust", "attachment", "direction"]);
+  it("covers the five Phase 1 sections, starting with where you come from", () => {
+    expect(SECTIONS.map((s) => s.key)).toEqual(["roots", "beginnings", "closeness_trust", "attachment", "direction"]);
   });
   it("validates answers by question type", () => {
     expect(validateAnswer(findQuestion("trust_level")!.question, 4)).toBe(4);

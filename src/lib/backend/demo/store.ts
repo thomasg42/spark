@@ -14,8 +14,13 @@ import {
   type CheckinAnswers,
   type CheckinSummary,
   type Couple,
+  type BuddyShare,
+  type BuddyTurn,
   type DateIdea,
+  type DatePlan,
   type Moment,
+  type MoneyGoal,
+  type Project,
   type Profile,
   type PulseEntry,
   type SavedAnswer,
@@ -31,7 +36,7 @@ export interface DemoCheckin {
 }
 
 export interface DemoState {
-  version: 3;
+  version: 4;
   signedIn: boolean;
   actingAs: string;
   personas: Array<{ id: string; name: string; email: string }>;
@@ -45,9 +50,16 @@ export interface DemoState {
   activities: Activity[];
   ideas: DateIdea[];
   moments: Moment[];
+  /** Per person: what their partner's Buddy may see (hint/open only). */
+  buddyShares: Record<string, BuddyShare[]>;
+  /** Per person: their private conversation with their own Buddy. */
+  buddyChats: Record<string, BuddyTurn[]>;
+  datePlans: DatePlan[];
+  projects: Project[];
+  money: MoneyGoal[];
 }
 
-const STORAGE_KEY = "spark-demo-v3";
+const STORAGE_KEY = "spark-demo-v4";
 let state: DemoState | null = null;
 const listeners = new Set<() => void>();
 
@@ -57,7 +69,7 @@ function load(): DemoState {
     const raw = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
     if (raw) {
       const parsed = JSON.parse(raw) as DemoState;
-      if (parsed && parsed.version === 3) {
+      if (parsed && parsed.version === 4) {
         state = parsed;
         return state;
       }

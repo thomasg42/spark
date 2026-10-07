@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { cx } from "@/lib/ui/cx";
 
-export const PRIVATE_ANSWERS_PROMISE = "Only you will ever see these answers. Your partner can't read them, and Spark never sends them to AI.";
+export const PRIVATE_ANSWERS_PROMISE =
+  "Only you will ever see these answers. Your partner can't read them unless you choose to share one through Spark Buddy, and Spark never sends them to AI unless you turn on AI for your Spark Buddy.";
 
 /** Says what is private BEFORE any question is asked (consent first). */
 export function PrivacyExplainer({ compact = false, className }: { compact?: boolean; className?: string }) {
