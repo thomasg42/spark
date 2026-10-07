@@ -11,6 +11,10 @@ Phase 1 is built (see README). This is the plan for the rest, in order. Each pha
 - **Second questionnaire (after month 1).** Pace, time together, attaching too much / too little / just right, what you want more of.
 - **Family & friends questionnaire.** The spec lists it in Module B but did not assign it to a phase; placed here. Who you've met, each person's opinion, whether concerns are fixable, suggested actions.
 
+- **Persist the living rhythm server-side.** Today the rhythm is recomputed from revealed check-in votes (one decrypting read per revealed month per session). A small migration adding `couples.rhythm` (set by the checkins function at reveal) removes that cost.
+- **Sub-monthly deep check-ins (Thomas, 2026-10-06).** If a couple votes their way to weekly, the full five-question check-in could follow that pace too. Needs a migration: `checkins.period` is month-keyed (`YYYY-MM`). Until then the agreed pace drives the quick check-in, and the deep check-in stays monthly.
+- **Favorites across devices.** Home favorites are saved per person on each device. A `profiles.home_favorites` column would sync them.
+
 ## Phase 3: Talking and hints
 
 - **Counselor Mode (private).** Voice input with the Web Speech API and a server-side transcription fallback. Calm, balanced coach: reflects feelings, one good question at a time, two or three practical options, de-escalates. Never diagnoses, never encourages tracking, retaliation or ultimatums, always notes it is not therapy. Crisis detection (`mentionsCrisis`) already exists and shows resources immediately. History private and deletable.

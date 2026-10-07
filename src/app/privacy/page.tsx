@@ -4,8 +4,8 @@ export const metadata = { title: "What's private" };
 
 const ROWS = [
   { what: "Your onboarding answers", who: "Only you. Never shown to your partner in any form.", how: "Encrypted before they're saved." },
-  { what: "Monthly check-in answers", who: "Only you until you both submit, then both of you.", how: "Encrypted. Revealed side by side." },
-  { what: "Weekly pulse scores", who: "Only you until you both submit for that week.", how: "Shown as a shared trend, never as blame." },
+  { what: "Monthly check-in answers and pace votes", who: "Only you until you both submit, then both of you.", how: "Encrypted. Revealed side by side." },
+  { what: "Quick check-in scores", who: "Only you until you both submit for that week.", how: "Shown as a shared trend, never as blame." },
   { what: "Our Story, Moments, notes, activities, date ideas", who: "The two of you.", how: "Photos and clips live in a private folder only you two can open." },
   { what: "Name, nickname, colors, check-in rhythm, social choice", who: "The two of you.", how: "So you can see each other's choices openly." },
 ];

@@ -59,7 +59,7 @@ describe("demo pulse", () => {
     await pulse.submit(thisWeek, 3, 3);
     await pulse.submit(thisWeek, 5, 4);
     const mine = (await pulse.history(1)).filter((p) => p.userId === DEMO_ALEX);
-    expect(mine).toEqual([{ userId: DEMO_ALEX, weekStart: thisWeek, excitement: 5, connection: 4 }]);
+    expect(mine).toEqual([{ updatedAt: expect.any(String), userId: DEMO_ALEX, weekStart: thisWeek, excitement: 5, connection: 4 }]);
   });
 
   it("validates scores and weeks", async () => {

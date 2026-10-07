@@ -12,7 +12,29 @@ export const CHECKIN_QUESTIONS = [
 ] as const;
 
 export type CheckinQuestionId = (typeof CHECKIN_QUESTIONS)[number]["id"];
-export type CheckinAnswers = Record<CheckinQuestionId, string>;
+
+/**
+ * Each partner's vote, asked on the monthly form, on how often the quick check-ins
+ * between monthly ones should pop up. Stored encrypted with the answers and revealed
+ * with them. The rhythm only moves when BOTH vote the same direction.
+ */
+export const PACE_VOTES = ["sooner", "same", "later"] as const;
+export type PaceVote = (typeof PACE_VOTES)[number];
+export const PACE_QUESTION = {
+  id: "pace",
+  prompt: "Should our quick check-ins come sooner or later than now?",
+  options: [
+    { value: "sooner", label: "Sooner", description: "Check in more often. We'd like a little more connection." },
+    { value: "same", label: "Keep the same pace", description: "The current rhythm feels right." },
+    { value: "later", label: "Later", description: "A bit more space between check-ins." },
+  ],
+} as const;
+
+export function isPaceVote(value: unknown): value is PaceVote {
+  return typeof value === "string" && (PACE_VOTES as readonly string[]).includes(value);
+}
+
+export type CheckinAnswers = Record<CheckinQuestionId, string> & { pace?: PaceVote };
 
 export const CHECKIN_ANSWER_MAX = 1000;
 
@@ -31,7 +53,12 @@ export function normalizeCheckinAnswers(input: unknown): CheckinAnswers {
     out[q.id] = text;
   }
   for (const key of Object.keys(raw)) {
+    if (key === "pace") continue;
     if (!CHECKIN_QUESTIONS.some((q) => q.id === key)) throw new Error(`Unknown question "${key}".`);
+  }
+  if (raw.pace !== undefined && raw.pace !== null) {
+    if (!isPaceVote(raw.pace)) throw new Error("Pick sooner, the same pace, or later.");
+    out.pace = raw.pace;
   }
   if (!any) throw new Error("Answer at least one question.");
   return out;

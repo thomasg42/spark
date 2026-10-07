@@ -5,7 +5,7 @@ import { ButtonLink, Card } from "@/components/ui";
 const PROMISES = [
   { emoji: "🔒", title: "Private by design", body: "Your private answers are never shown to your partner. Only what you choose to share, in the form you choose." },
   { emoji: "🚫", title: "No tracking, ever", body: "No location, no monitoring, no reading each other's phone. Trust is built with honesty and routine." },
-  { emoji: "🌱", title: "Small, repeated actions", body: "A weekly pulse, a monthly check-in, date ideas that aren't repeats. No streaks, no guilt." },
+  { emoji: "🌱", title: "Small, repeated actions", body: "Quick check-ins at a pace you both agree on, a monthly check-in, date ideas that aren't repeats. No streaks, no guilt." },
   { emoji: "✦", title: "Moments, just for two", body: "Send each other clips, photos and links here instead of posting them everywhere." },
 ];
 

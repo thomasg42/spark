@@ -4,6 +4,12 @@ A private two-person app that helps a couple stay connected for the long term: c
 
 **Phase 1** is in this repo: email sign-in and pairing, profiles with personal themes, Our Story timeline, private onboarding questionnaires, weekly pulse, monthly check-in with hidden-until-both reveal and an AI summary, appreciation notes, activity log with ratings, a Claude-powered date idea generator, cadence negotiation, a social media agreement, and **Moments** (a private feed of clips, photos, links and notes for the two of you). Later phases are in [ROADMAP.md](ROADMAP.md).
 
+## How the app feels (2026-10-06 update)
+
+- **Home has no repeats of the bottom bar.** It shows a greeting, anything worth celebrating soon, and each person's own **favorites** (default: Date ideas, Appreciation notes, Our Story, Questions; editable, saved per person on their device). Every list is a row with everything on the left and an arrow on the right; tapping opens that screen full size, sliding in from the right, with the tab bar stepping aside and a back link at the top.
+- **Check-ins come to you.** The monthly check-in pops up every month until you've done it. Between monthly ones, the quick check-in pops up whenever your agreed rhythm says it's due. "Not now" hides it for this visit only.
+- **You re-agree the pace each month.** The monthly form asks "Should our quick check-ins come sooner or later than now?" The vote is encrypted with the answers and revealed with them. The rhythm starts as the split of both picks and moves one step only when both vote the same way (`src/lib/domain/rhythm.ts`).
+
 ## Principles the code enforces
 
 1. **No tracking or monitoring.** No location, no activity surveillance, no third-party embeds in the feed.
@@ -85,6 +91,7 @@ npm run build        # static export into out/
 |---|---|
 | `tests/db/privacy.test.ts` | Partner A cannot read, count, update, delete or forge partner B's private answers; check-in answers and pulse scores stay hidden until both submit; outsiders and signed-out visitors see nothing; pairing rules; storage folder isolation. Runs the real migrations on PGlite. |
 | `tests/unit/cadence.test.ts` | Cadence negotiation (daily + monthly = weekly, weekly + monthly = biweekly, symmetry, bounds), life-change boost, due dates, quarterly review. |
+| `tests/unit/rhythm.test.ts`, `tests/unit/home-rhythm.test.tsx` | Pace votes move the rhythm only when both agree and never leak before reveal; quick check-in due dates; the check-in pop-up and Not now; Home shows favorites and no bottom-bar repeats. |
 | `tests/unit/triggers.test.ts` | Rhythm trigger logic: category rut, excitement dropping two weeks running, little time together, life change, and the supportive suggestions they map to. |
 | `tests/unit/crypto.test.ts` | Encryption round trip, fresh IVs, wrong scope/row/key rejected, tamper detection, no plaintext in errors. |
 | `tests/unit/domain.test.ts` | Dates and anniversaries, social agreement (always the more private choice), WCAG AA contrast for every theme, crisis detection, questionnaire rules. |

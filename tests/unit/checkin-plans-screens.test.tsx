@@ -26,11 +26,13 @@ describe("Check-in and Plans screens", () => {
   it("shows the three check-in cards and the negotiated rhythm", async () => {
     renderApp(<CheckinHub />);
     expect(await screen.findByRole("heading", { name: "Check-in" })).toBeTruthy();
-    expect(await screen.findByRole("heading", { name: "Weekly pulse" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Monthly check-in" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Appreciation notes" })).toBeTruthy();
+    // Arrow rows: everything on the left, the arrow on the right, the whole row opens the screen.
+    expect((await screen.findByRole("link", { name: /Quick check-in/ })).getAttribute("href")).toBe("/checkin/pulse/");
+    expect(screen.getByRole("link", { name: /Monthly check-in/ }).getAttribute("href")).toBe("/checkin/monthly/");
+    expect(screen.getByRole("link", { name: /Appreciation notes/ }).getAttribute("href")).toBe("/checkin/notes/");
     expect(screen.getByText("Your shared rhythm")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Weekly pulse/ }).getAttribute("href")).toBe("/checkin/pulse/");
+    // The tab bar already reaches Home, so the hub doesn't repeat a Home link.
+    expect(screen.queryByRole("link", { name: /^‹?\s*Home$/ })).toBeNull();
   });
 
   it("groups activities, filters by category, and keeps rating controls per activity", async () => {

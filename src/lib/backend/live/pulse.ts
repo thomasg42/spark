@@ -2,15 +2,16 @@ import { parseISODate, previousWeekStart, weekStartOf, type ISODate } from "@/li
 import { UserFacingError, type Backend, type PulseEntry } from "../types";
 import { fail, requireCoupleId, requireUserId, supabase } from "./client";
 
-type Row = { user_id: string; week_start: string; excitement: number; connection: number };
+type Row = { user_id: string; week_start: string; excitement: number; connection: number; updated_at?: string | null };
 
-const COLUMNS = "user_id, week_start, excitement, connection";
+const COLUMNS = "user_id, week_start, excitement, connection, updated_at";
 
 const toEntry = (r: Row): PulseEntry => ({
   userId: r.user_id,
   weekStart: r.week_start,
   excitement: Number(r.excitement),
   connection: Number(r.connection),
+  ...(r.updated_at ? { updatedAt: r.updated_at } : {}),
 });
 
 /** A Monday in YYYY-MM-DD form, not after this week. */

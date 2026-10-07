@@ -47,7 +47,7 @@ export const pulse: Backend["pulse"] = {
     const uid = me();
     myCouple();
     return demoStore.update((s) => {
-      const entry: PulseEntry = { userId: uid, weekStart, excitement, connection };
+      const entry: PulseEntry = { userId: uid, weekStart, excitement, connection, updatedAt: new Date().toISOString() };
       const index = s.pulses.findIndex((p) => p.userId === uid && p.weekStart === weekStart);
       if (index >= 0) s.pulses[index] = entry;
       else s.pulses.push(entry);

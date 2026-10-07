@@ -88,6 +88,8 @@ export interface PulseEntry {
   weekStart: ISODate;
   excitement: number;
   connection: number;
+  /** When this entry was last saved (ISO timestamp); drives the quick check-in pop-up. */
+  updatedAt?: string;
 }
 
 export interface PulseWeekStatus {

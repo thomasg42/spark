@@ -14,7 +14,7 @@
  *  - Nothing here logs answers, plaintext, ciphertext or keys.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { CHECKIN_QUESTIONS, normalizeCheckinAnswers, type CheckinAnswers, type CheckinSummary } from "./checkin-questions.ts";
+import { CHECKIN_QUESTIONS, isPaceVote, normalizeCheckinAnswers, type CheckinAnswers, type CheckinSummary } from "./checkin-questions.ts";
 import { coerceSummary, summarizeCheckin } from "./checkin-summary.ts";
 import { aad, scopes, type Sealer } from "./crypto.ts";
 import { dbError, HttpError, type Handler } from "./http.ts";
@@ -158,7 +158,7 @@ export function validatePeriod(value: unknown, now: Date): string {
   return value;
 }
 
-/** Decrypted answers re-shaped to exactly the five known questions. */
+/** Decrypted answers re-shaped to exactly the five known questions plus the optional pace vote. */
 export function coerceAnswers(value: unknown): CheckinAnswers {
   const raw = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   const out = {} as CheckinAnswers;
@@ -166,6 +166,7 @@ export function coerceAnswers(value: unknown): CheckinAnswers {
     const v = raw[q.id];
     out[q.id] = typeof v === "string" ? v : "";
   }
+  if (isPaceVote(raw.pace)) out.pace = raw.pace;
   return out;
 }
 

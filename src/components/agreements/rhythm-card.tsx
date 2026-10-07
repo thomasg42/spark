@@ -6,6 +6,7 @@ import type { PickableCadence } from "@/lib/backend/types";
 import { CADENCE_LABELS, PICKABLE_CADENCES } from "@/lib/domain/cadence";
 import { useAction } from "@/lib/ui/hooks";
 import { CadenceLadder } from "./cadence-ladder";
+import { useRhythm } from "@/lib/ui/rhythm";
 import { cadenceSavedMessage, personName, previewAgreed, revisitInfo, rhythmView } from "./view-model";
 
 /** Check-in rhythm: both picks side by side, the split, the ladder, and the quarterly revisit. */
@@ -26,6 +27,11 @@ export function RhythmCard() {
   const mine = profile?.preferredCadence ?? null;
   const partnerPick = partner?.preferredCadence ?? null;
   const view = rhythmView(mine, partnerPick, partnerName);
+  const { rhythm } = useRhythm();
+  const votesNote =
+    rhythm.current && rhythm.steps !== 0
+      ? `Your picks split to ${view.agreedLabel?.toLowerCase() ?? "a starting rhythm"}. Your monthly check-in votes since then moved it ${Math.abs(rhythm.steps)} step${Math.abs(rhythm.steps) === 1 ? "" : "s"} ${rhythm.steps < 0 ? "sooner" : "later"}.`
+      : null;
   const revisit = revisitInfo(couple?.cadenceReviewedAt, today);
 
   const save = useAction(async (next: PickableCadence) => {
@@ -110,12 +116,13 @@ export function RhythmCard() {
         <p className="text-sm font-semibold text-accent-text">Your shared rhythm</p>
         {view.agreedLabel ? (
           <p key={view.agreed} className="pop mt-1 font-display text-3xl font-bold text-ink">
-            {view.agreedLabel}
+            {rhythm.current && rhythm.steps !== 0 ? CADENCE_LABELS[rhythm.current] : view.agreedLabel}
           </p>
         ) : (
           <p className="mt-1 font-display text-2xl font-bold text-ink">Waiting for {partnerName}</p>
         )}
         <p className="mx-auto mt-1 max-w-md text-sm text-ink">{view.explanation}</p>
+        {votesNote ? <p className="mx-auto mt-2 max-w-md text-sm font-semibold text-accent-text">{votesNote}</p> : null}
       </div>
 
       <CadenceLadder steps={view.steps} partnerName={partnerName} />

@@ -1,8 +1,10 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { LAST_TAB_KEY } from "@/lib/ui/last-tab";
 import { useApp } from "./app-provider";
+import { CheckinPrompt } from "./checkin/checkin-prompt";
 import { cx } from "@/lib/ui/cx";
 
 const TABS = [
@@ -49,10 +51,31 @@ function DemoBar() {
   );
 }
 
+/**
+ * A drill-down screen sits one level below a tab (for example /checkin/pulse/ or
+ * /plans/ideas/). It opens full screen, sliding in from the right, with its own
+ * back link, so the tab bar steps aside.
+ */
+export function isDrillDown(pathname: string): boolean {
+  const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
+  return TABS.some((tab) => path !== tab.href && path.startsWith(tab.href));
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { stage, profile, partner } = useApp();
   const pathname = usePathname() ?? "/";
-  const showTabs = stage === "ready";
+  const drill = stage === "ready" && isDrillDown(pathname);
+  const showTabs = stage === "ready" && !drill;
+
+  // Remember which tab a drill-down was opened from, so its back link can return there.
+  useEffect(() => {
+    if (stage !== "ready" || drill) return;
+    try {
+      sessionStorage.setItem(LAST_TAB_KEY, TABS.some((t) => t.href === (pathname.endsWith("/") ? pathname : `${pathname}/`)) ? pathname : "");
+    } catch {
+      // storage blocked: back links keep their default target
+    }
+  }, [stage, drill, pathname]);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -74,11 +97,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main id="main" className={cx("mx-auto w-full max-w-2xl flex-1 px-4 pt-6", showTabs ? "pb-nav" : "pb-12")}>
-        {children}
+      <main id="main" tabIndex={-1} className={cx("mx-auto w-full max-w-2xl flex-1 px-4 pt-6 focus:outline-none", showTabs ? "pb-nav" : "pb-12")}>
+        <div key={pathname} className={drill ? "slide-in-right" : undefined}>
+          {children}
+        </div>
       </main>
 
-      <footer className={cx("mx-auto w-full max-w-2xl px-4 pb-6 text-center text-xs text-muted", showTabs && "mb-20")}>
+      <footer className={cx("mx-auto w-full max-w-2xl px-4 text-center text-xs text-muted", showTabs && "mb-20")} style={{ paddingBottom: "calc(1.5rem + var(--checkin-prompt-h, 0px))" }}>
         <p>
           <Link href="/support/" className="font-semibold text-accent-text underline">
             Need support now?
@@ -86,6 +111,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           · <Link href="/privacy/" className="underline">What's private</Link> · Spark is not therapy. 18+ only.
         </p>
       </footer>
+
+      <CheckinPrompt aboveTabs={showTabs} />
 
       {showTabs ? (
         <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">

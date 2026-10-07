@@ -38,7 +38,7 @@ export function PlansScreen() {
 
   return (
     <>
-      <PageHeader title="Plans" subtitle="Keep the good things visible and make room for the next one." back={{ href: "/home/", label: "Home" }} action={<Link href="/plans/ideas/" className="inline-flex min-h-11 items-center rounded-full bg-accent px-4 font-semibold text-accent-ink">Ideas</Link>} />
+      <PageHeader title="Plans" subtitle="Keep the good things visible and make room for the next one." action={<Link href="/plans/ideas/" className="inline-flex min-h-11 items-center rounded-full bg-accent px-4 font-semibold text-accent-ink">Ideas</Link>} />
       <div className="mb-5 overflow-x-auto pb-1"><ChoiceGroup legend="Filter activities" options={[{ value: "all", label: "All" }, ...ACTIVITY_CATEGORIES.map((value) => ({ value, label: CATEGORY_COPY[value].label }))]} value={category} onChange={setCategory as (value: string) => void} columns={2} name="activity-filter" /></div>
       <Link href="/plans/new/" className="mb-5 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent px-5 font-semibold text-accent-ink">Log an activity</Link>
       {list.error ? <Notice tone="danger" title={list.error} /> : null}

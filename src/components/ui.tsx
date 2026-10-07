@@ -4,7 +4,8 @@
  * labels wired to inputs, and errors announced to screen readers.
  */
 import Link from "next/link";
-import { createContext, useCallback, useContext, useId, useMemo, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { LAST_TAB_KEY, resolveBack } from "@/lib/ui/last-tab";
 
 import { cx } from "@/lib/ui/cx";
 export { cx };
@@ -52,7 +53,18 @@ export function Card({ children, className, as: Tag = "section", ...rest }: { ch
   );
 }
 
-export function PageHeader({ title, subtitle, back, action }: { title: string; subtitle?: ReactNode; back?: { href: string; label: string }; action?: ReactNode }) {
+export function PageHeader({ title, subtitle, back: defaultBack, action }: { title: string; subtitle?: ReactNode; back?: { href: string; label: string }; action?: ReactNode }) {
+  const [back, setBack] = useState(defaultBack);
+  useEffect(() => {
+    if (!defaultBack) return setBack(undefined);
+    let last: string | null = null;
+    try {
+      last = sessionStorage.getItem(LAST_TAB_KEY);
+    } catch {
+      last = null;
+    }
+    setBack(resolveBack(defaultBack, last));
+  }, [defaultBack?.href, defaultBack?.label]);
   return (
     <header className="mb-5 fade-up">
       {back ? (

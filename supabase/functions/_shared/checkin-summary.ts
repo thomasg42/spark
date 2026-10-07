@@ -138,7 +138,7 @@ function cleanList(value: unknown, max: number): string[] {
 
 /** True when any answer from either partner mentions danger, abuse, or self-harm. */
 export function answersMentionCrisis(...sets: Array<CheckinAnswers | null | undefined>): boolean {
-  return sets.some((answers) => !!answers && mentionsCrisis(...Object.values(answers)));
+  return sets.some((answers) => !!answers && mentionsCrisis(...CHECKIN_QUESTIONS.map((q) => answers[q.id])));
 }
 
 /** When flagged, keep the warm overlaps but drop discussion prompts on the risky topic. */

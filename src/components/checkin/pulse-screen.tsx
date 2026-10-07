@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useApp } from "@/components/app-provider";
+import { useRhythm } from "@/lib/ui/rhythm";
 import { Button, Card, Notice, PageHeader, ScaleInput, useToast } from "@/components/ui";
 import { useLoad, useAction } from "@/lib/ui/hooks";
 import { periodOf, weekStartOf } from "@/lib/domain/dates";
@@ -9,6 +10,7 @@ import { trendNote, trendWeeks } from "./pulse-trend";
 import { PulseChart, PulseLegend, PulseTable } from "./pulse-chart";
 
 export function PulseScreen() {
+  const { rhythm } = useRhythm();
   const { backend, user, partner } = useApp();
   const toast = useToast();
   const today = useMemo(() => new Date(), []);
@@ -33,7 +35,10 @@ export function PulseScreen() {
 
   return (
     <>
-      <PageHeader title="Weekly pulse" subtitle="Two quick scores. No grades, no blame." back={{ href: "/checkin/", label: "Check-in" }} />
+      <PageHeader title="Quick check-in" subtitle="Two quick scores at the pace you both agreed. No grades, no blame." back={{ href: "/checkin/", label: "Check-in" }} />
+      {rhythm.current === "daily" || rhythm.current === "twice_weekly" ? (
+        <p className="-mt-2 mb-4 text-sm text-muted">Spark keeps one score per week, so checking in again this week updates it.</p>
+      ) : null}
       <Card>
         <p className="text-sm text-muted">Week of {new Date(`${week}T12:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric" })}</p>
         <h2 className="mt-1 text-xl font-bold text-ink">How does it feel lately?</h2>
