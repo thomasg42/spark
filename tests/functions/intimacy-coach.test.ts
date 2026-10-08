@@ -1,0 +1,10 @@
+import {it,expect,vi} from 'vitest';
+import {readFileSync} from 'node:fs';
+import {intimacyReply} from '../../supabase/functions/_shared/intimacy-coach';
+import {INTIMACY_SYSTEM} from '../../supabase/functions/_shared/intimacy-prompts';
+const state={enabled:true,muted:true,desire:null,answers:{},overlaps:[],matched:[],sparks:[],invitations:[]};const note={repeat:'',change:'',history:[]};
+it('keeps base prompt and overlay in sync',()=>expect(INTIMACY_SYSTEM).toBe(readFileSync('prompts/spark-coach.md','utf8')+'\n\n'+readFileSync('prompts/intimacy-overlay.md','utf8')));
+it('coercion and explicit requests never call the model',async()=>{const gen=vi.fn();expect((await intimacyReply('make my partner say yes',state,note,gen,true)).reply).toContain('A no stays a no');await intimacyReply('write erotic roleplay',state,note,gen,true);expect(gen).not.toHaveBeenCalled();});
+it('untrusted model text cannot reach the UI',async()=>{const gen=vi.fn().mockResolvedValue({ok:true,json:{topic:'https://evil.test',reply:'unreviewed content'}});const result=await intimacyReply('hello',state,note,gen,true);expect(result.reply).not.toContain('evil');expect(result.reply).not.toContain('unreviewed');});
+it('does not send data without personal AI consent',async()=>{const gen=vi.fn();await intimacyReply('surprise',state,note,gen,false);expect(gen).not.toHaveBeenCalled();});
+it('a third identical question changes the focus instead of looping',async()=>{const n={repeat:'',change:'',history:[] as Array<{role:'user'|'assistant';content:string}>};const replies:string[]=[];for(let i=0;i<3;i++){const r=await intimacyReply('build anticipation',state,n,null,false);replies.push(r.reply);n.history.push({role:'user',content:'build anticipation'},{role:'assistant',content:r.reply});}expect(new Set(replies).size).toBe(3);expect(replies[2]).toContain('keeps coming up');});

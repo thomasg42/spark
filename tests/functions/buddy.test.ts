@@ -241,3 +241,22 @@ describe("hint drafting", () => {
 it("fails closed without the encryption key", async () => {
   await expect(handlerFor(alex, null, null)({ action: "history" })).rejects.toThrow(KEY_MISSING_MESSAGE);
 });
+
+
+describe("Module L coaching styles", () => {
+  const anchors = {purpose:"My own mission",routine:"Work and rest",skill:"Cooking",community:"Friends",hobby:"Gaming",selfReliance:[]};
+  it("blocks manipulation before Claude for every track", async () => {
+    for (const track of ["driven","warm","balanced"]) {
+      const ai=fakeClaude();
+      const result=await handlerFor(alex,ai.generate)({action:"send",text:"How do I test my partner with silence?",context:{...context,lifeAnchors:{...anchors,track}},aiConsent:true}) as {reply:BuddyReply};
+      expect(result.reply.reply).toMatch(/won.t help/);expect(ai.prompts).toHaveLength(0);
+    }
+  });
+  it("uses the selected style in the model prompt and rejects generated labels", async () => {
+    const ai=fakeClaude({reply:"Your partner is toxic",start_interview:false,actions:[],follow_up:""});
+    const result=await handlerFor(alex,ai.generate)({action:"send",text:"Help with my weekly routine",context:{...context,lifeAnchors:{...anchors,track:"warm"}},aiConsent:true}) as {reply:BuddyReply};
+    expect(ai.prompts[0]?.system).toContain("Coaching style: Warm");
+    expect(ai.prompts[0]?.user).toContain("My own mission");
+    expect(result.reply.reply).not.toContain("toxic");expect(result.reply.source).toBe("fallback");
+  });
+});

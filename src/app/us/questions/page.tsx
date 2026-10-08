@@ -65,6 +65,7 @@ function QuestionsHub() {
       <PageHeader title="Questions" subtitle="Short, private sets about you. Go at your own pace." back={{ href: "/us/", label: "Us" }} />
 
       <PrivacyExplainer className="fade-up" />
+      <p className="my-5 text-muted">Getting started with Buddy? <Link href="/plans/dreams/anchors/" className="font-semibold text-accent-text underline">Choose Driven, Warm, or Balanced coaching</Link> and optionally add your Life Anchors. You can change them anytime.</p>
 
       <SectionTitle id="question-sets">Your question sets</SectionTitle>
       <p className="-mt-1 mb-3 text-sm text-muted">A handful of questions per sitting. Progress saves after every answer, and you can stop any time.</p>

@@ -30,10 +30,10 @@ export function ActivityForm() {
     if (idea) await backend.ideas.setStatus(idea.id, "done");
     return activity;
   });
-  const submit = async (event: FormEvent) => { event.preventDefault(); const result = await save.run(); if (result) { toast.show("Activity logged."); router.push("/plans/"); } };
+  const submit = async (event: FormEvent) => { event.preventDefault(); const result = await save.run(); if (result) { toast.show("Activity logged."); router.push("/activities/"); } };
   return (
     <>
-      <PageHeader title="Log an activity" subtitle={idea ? `Logging “${idea.title}”` : "Keep a memory of what you did together."} back={{ href: "/plans/", label: "Plans" }} />
+      <PageHeader title="Log an activity" subtitle={idea ? `Logging “${idea.title}”` : "Keep a memory of what you did together."} back={{ href: "/activities/", label: "Activities" }} />
       <Card><form onSubmit={submit} noValidate><TextField label="Title" value={title} onChange={setTitle} maxLength={120} placeholder="Dinner at the new place" required /><TextField label="Date" type="date" value={date} onChange={setDate} required max={toISODate(new Date(Date.now() + 86_400_000))} /><SelectField<ActivityCategory> label="Category" value={category} onChange={setCategory} options={ACTIVITY_CATEGORIES.map((value) => ({ value, label: `${CATEGORY_COPY[value].emoji} ${CATEGORY_COPY[value].label}` }))} /><TextAreaField label="Note" optional value={note} onChange={setNote} maxLength={2000} rows={4} placeholder="What would you remember about it?" /><PhotoPicker existingPath={null} file={file} removed={false} title={title} error={photoError} onPick={setFile} onRemove={() => setFile(null)} onError={setPhotoError} /><Button type="submit" loading={save.pending}>Save activity</Button>{save.error ? <Notice tone="danger" className="mt-3" title={save.error} /> : null}</form></Card>
     </>
   );

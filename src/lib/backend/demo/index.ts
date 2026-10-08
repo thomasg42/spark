@@ -1,3 +1,5 @@
+import {intimacy} from './intimacy';
+import { dreams } from "./shared-dreams";
 import type { Backend } from "../types";
 import { activities } from "./activities";
 import { answers } from "./answers";
@@ -21,7 +23,8 @@ import { story } from "./story";
 
 export function createDemoBackend(): Backend {
   return {
-    mode: "demo",
+    mode: "demo", intimacy,
+    dreams,
     demo: {
       get personas() {
         return demoStore.get().personas.map((p) => ({ id: p.id, name: demoStore.get().profiles[p.id]?.displayName ?? p.name }));

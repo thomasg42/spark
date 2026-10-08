@@ -1,3 +1,4 @@
+import { coachSupport } from "./shared-dreams.ts";
 /**
  * "buddy" Edge Function logic (Spark Buddy), kept free of Deno APIs so it is unit
  * tested in Node with an in-memory repo, a real sealer and a fake Claude.
@@ -315,6 +316,8 @@ export function createBuddyHandler(deps: BuddyDeps): Handler {
         if (mentionsCrisis(text)) {
           // Never route a possible emergency through the model: resources come first, every time.
           reply = crisisReply();
+        } else if (coachSupport(text, context.lifeAnchors?.track).text.startsWith("I won't help")) {
+          reply = fallbackReply(request);
         } else {
           let result: JsonResult | null = null;
           // AI only with the person's explicit consent: otherwise nothing they said or answered leaves Spark.

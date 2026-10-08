@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
+import {useIntimacy} from "./intimacy/use-intimacy";
 import { LAST_TAB_KEY } from "@/lib/ui/last-tab";
 import { isBackSwipe, isBackTo, readStack, recordVisit, swipeBackTarget } from "@/lib/ui/nav-stack";
 import { useApp } from "./app-provider";
@@ -13,6 +14,10 @@ const TABS = [
   { href: "/moments/", label: "Moments", icon: "✦" },
   { href: "/checkin/", label: "Check-in", icon: "♡" },
   { href: "/plans/", label: "Plans", icon: "◷" },
+  { href: "/activities/", label: "Activities", icon: "◇" },
+  { href: "/history/", label: "History", icon: "↶" },
+  { href: "/intimacy/", label: "Intimacy", icon: "♡" },
+  { href: "/people/", label: "Family & Friends", icon: "♧" },
   { href: "/us/", label: "Us", icon: "∞" },
 ] as const;
 
@@ -65,10 +70,14 @@ export function isDrillDown(pathname: string): boolean {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { stage, profile, partner } = useApp();
+  const intimacy=useIntimacy();
+  const visibleTabs=TABS.filter(t=>t.href!=="/intimacy/"||intimacy.data?.enabled);
   const pathname = usePathname() ?? "/";
   const router = useRouter();
   const drill = stage === "ready" && isDrillDown(pathname);
   const showTabs = stage === "ready";
+
+  useEffect(()=>{document.querySelector<HTMLAnchorElement>('nav[aria-label="Main"] a[aria-current="page"]')?.scrollIntoView?.({block:"nearest",inline:"nearest"});},[pathname,intimacy.data?.enabled]);
 
   // The app's own back stack, so the back arrow, the tabs and swipe-back agree.
   useEffect(() => {
@@ -152,11 +161,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {showTabs ? (
         <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-          <ul className="mx-auto flex max-w-2xl">
-            {TABS.map((tab) => {
+          <ul className="mx-auto flex max-w-2xl overflow-x-auto overscroll-x-contain">
+            {visibleTabs.map((tab) => {
               const active = pathname === tab.href || pathname.startsWith(tab.href);
               return (
-                <li key={tab.href} className="flex-1">
+                <li key={tab.href} className="min-w-[84px] shrink-0 flex-1">
                   <Link
                     href={tab.href}
                     onClick={(e) => {
@@ -167,7 +176,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       }
                     }}
                     aria-current={active ? "page" : undefined}
-                    className={cx("flex min-h-16 flex-col items-center justify-center gap-0.5 text-xs font-semibold", active ? "text-accent-text" : "text-muted")}
+                    className={cx("flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 text-center text-xs font-semibold", active ? "text-accent-text" : "text-muted")}
                   >
                     <span aria-hidden className={cx("text-xl leading-none", active && "pop")}>
                       {tab.icon}

@@ -1,3 +1,5 @@
+import type {DemoIntimacy} from './intimacy';
+import type { DreamRecord } from "@shared/shared-dreams.ts";
 /**
  * Demo mode store: everything lives in this browser (localStorage for data,
  * IndexedDB for uploaded photos/clips). Nothing is sent anywhere. Used for the
@@ -39,6 +41,9 @@ export interface DemoCheckin {
 }
 
 export interface DemoState {
+  intimacy?: DemoIntimacy;
+  dreams?: DreamRecord[];
+  dreamRoadmapConsent?: Record<string, boolean>;
   version: 4;
   signedIn: boolean;
   actingAs: string;
@@ -83,6 +88,8 @@ function load(): DemoState {
         parsed.dateRules ??= [];
         parsed.lifeChanges ??= [];
         parsed.distanceFlags ??= [];
+        parsed.dreams ??= [];
+        parsed.dreamRoadmapConsent ??= {};
         state = parsed;
         return state;
       }

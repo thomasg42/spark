@@ -1,3 +1,4 @@
+import { dreams } from "./shared-dreams";
 import { fallbackHint, fallbackReply, isHintMoment, isShareLevel, MESSAGE_MAX, sanitizeClientContext, sharedTextFor, type BuddyShare, type BuddyTurn, type PartnerShare, type ShareTeaser } from "@shared/buddy.ts";
 import { hintMomentActive } from "@/lib/domain/hint-moments";
 import { findQuestion } from "@shared/questionnaires.ts";
@@ -72,7 +73,9 @@ export const buddy: Backend["buddy"] = {
       interviewQuestionId = input.interviewQuestionId;
     }
     const history = (demoStore.get().buddyChats[uid] ?? []).slice(-12).map(copyTurn);
-    const reply = fallbackReply({ text, interviewQuestionId, context: sanitizeClientContext(input.context), partnerShares: partnerSharesFor(uid), history });
+    const anchor = (await dreams.list()).items.find(x => x.kind === "anchors" && x.ownerId === uid);
+    const context = sanitizeClientContext({...input.context, lifeAnchors: anchor?.kind === "anchors" ? anchor.payload : undefined});
+    const reply = fallbackReply({ text, interviewQuestionId, context, partnerShares: partnerSharesFor(uid), history });
     demoStore.update((s) => {
       const chat = (s.buddyChats[uid] ??= []);
       chat.push({ role: "user", text, at: nowIso(), meta: null }, { role: "buddy", text: reply.reply, at: nowIso(), meta: reply.meta });

@@ -1,0 +1,6 @@
+import {beforeAll,afterAll,it,expect} from 'vitest';
+import {createDb,makePairedCouple,asUser,type Db} from './harness';
+let db:Db;let a:string,b:string,cid:string,other:string;
+beforeAll(async()=>{db=await createDb();const p=await makePairedCouple(db);a=p.alex;b=p.sam;cid=p.coupleId;other=(await makePairedCouple(db)).alex;});afterAll(()=>db?.close());
+it('shares people only inside their couple and protects private health',async()=>{await asUser(db,a,tx=>tx.query("insert into shared_dreams(couple_id,owner_id,kind,visibility,payload_ciphertext) values($1,$2,'person','shared','v1.test'),($1,$2,'health','private','v1.private')",[cid,a]));expect((await asUser(db,b,tx=>tx.query('select kind from shared_dreams'))).rows).toEqual([{kind:'person'}]);expect((await asUser(db,other,tx=>tx.query('select kind from shared_dreams'))).rows).toEqual([]);await expect(asUser(db,a,tx=>tx.query("update shared_dreams set visibility='shared' where kind='health'"))).rejects.toThrow();});
+it('partner cannot overwrite the owner’s people card',async()=>{const r=await asUser(db,b,tx=>tx.query("update shared_dreams set payload_ciphertext='v1.changed' where kind='person' returning id"));expect(r.rows).toEqual([]);});

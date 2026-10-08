@@ -35,7 +35,7 @@ export function createClaudeGenerator(apiKey: string | undefined): JsonGenerator
       if (response.stop_reason === "max_tokens") return { ok: false, reason: "truncated" };
 
       const text = response.content
-        .map((block) => (block.type === "text" ? block.text : ""))
+        .map((block: { type: string; text?: string }) => (block.type === "text" ? block.text ?? "" : ""))
         .join("")
         .trim();
       try {
@@ -45,8 +45,8 @@ export function createClaudeGenerator(apiKey: string | undefined): JsonGenerator
       }
     } catch (error) {
       // Log only the error class and status; never request bodies, answers, or keys.
-      if (error instanceof Anthropic.APIError) {
-        console.error(`Claude API error: ${error.constructor.name} status=${error.status}`);
+      if (error instanceof Error && "status" in error && typeof error.status === "number") {
+        console.error(`Claude API error: ${error.name} status=${error.status}`);
       } else {
         console.error("Claude request failed:", error instanceof Error ? error.name : "unknown");
       }

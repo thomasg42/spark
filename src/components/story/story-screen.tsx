@@ -104,7 +104,7 @@ export function StoryScreen() {
   return (
     <>
       <PageHeader
-        title="Our Story"
+        title="History"
         subtitle="The moments that made you two. You can both add to it."
         back={{ href: "/us/", label: "Us" }}
         action={

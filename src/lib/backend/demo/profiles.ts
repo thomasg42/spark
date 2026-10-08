@@ -45,6 +45,7 @@ export const profiles: Backend["profiles"] = {
       for (const [key, value] of Object.entries(patch)) {
         if (value !== undefined) (next as unknown as Record<string, unknown>)[key] = value;
       }
+      if (patch.pronouns !== undefined) next.pronouns=patch.pronouns?.trim().slice(0,40)||null;
       if (patch.displayName !== undefined && !patch.displayName.trim()) throw new UserFacingError("Add your name.");
       s.profiles[uid] = next;
       return next;

@@ -2,6 +2,7 @@ import { UserFacingError, type Backend, type Profile } from "../types";
 import { fail, requireUserId, supabase } from "./client";
 
 type Row = {
+  pronouns: string | null;
   user_id: string;
   display_name: string;
   nickname: string | null;
@@ -14,10 +15,11 @@ type Row = {
   social_sharing: Profile["socialSharing"];
 };
 
-const COLUMNS = "user_id, display_name, nickname, birthday, birth_time, birth_place, accent_theme, color_mode, preferred_cadence, social_sharing";
+const COLUMNS = "pronouns, user_id, display_name, nickname, birthday, birth_time, birth_place, accent_theme, color_mode, preferred_cadence, social_sharing";
 
 export const toProfile = (r: Row): Profile => ({
   userId: r.user_id,
+  pronouns: r.pronouns,
   displayName: r.display_name,
   nickname: r.nickname,
   birthday: r.birthday,
@@ -69,6 +71,7 @@ export const profiles: Backend["profiles"] = {
   async update(patch) {
     const uid = await requireUserId();
     const row: Record<string, unknown> = {};
+    if (patch.pronouns !== undefined) row.pronouns = patch.pronouns?.trim() || null;
     if (patch.displayName !== undefined) row.display_name = patch.displayName.trim();
     if (patch.nickname !== undefined) row.nickname = patch.nickname?.trim() || null;
     if (patch.birthTime !== undefined) row.birth_time = patch.birthTime || null;

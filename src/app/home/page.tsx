@@ -1,4 +1,5 @@
 "use client";
+import { CoachingWelcome } from "@/components/dreams/coaching-welcome";
 /**
  * Home: a calm start screen with no repeats of the bottom tabs. Just a greeting,
  * anything worth celebrating soon, and the person's own favorites, each a row
@@ -64,6 +65,7 @@ function Dashboard() {
 
   const status = (id: FavoriteId): { text: string; badge?: string | null } => {
     switch (id) {
+      case "dreams": return { text: "Dream board, weekly support, and Life Anchors" };
       case "ideas": {
         const saved = d?.ideas?.filter((i) => i.status === "saved").length ?? 0;
         return { text: saved ? `${saved} saved for later` : "Five fresh ideas, never repeats" };
@@ -122,6 +124,7 @@ function Dashboard() {
     <div className="fade-up">
       <h1 className="text-3xl font-bold text-ink">Hi, {profile?.nickname || profile?.displayName}</h1>
 
+      <CoachingWelcome />
       <RhythmCards />
 
       {anniversary ? (

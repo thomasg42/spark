@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { AppProvider } from "@/components/app-provider";
 import { ToastProvider } from "@/components/ui";
 import { CheckinHub } from "@/components/checkin/checkin-hub";
-import { PlansScreen } from "@/components/plans/plans-screen";
+import { ActivitiesScreen } from "@/components/plans/plans-screen";
 import { DEMO_ALEX, demoStore } from "@/lib/backend/demo/store";
 
 vi.mock("next/link", () => ({
@@ -36,7 +36,7 @@ describe("Check-in and Plans screens", () => {
   });
 
   it("groups activities, filters by category, and keeps rating controls per activity", async () => {
-    renderApp(<PlansScreen />);
+    renderApp(<ActivitiesScreen />);
     expect(await screen.findByRole("heading", { name: "Farmers market + picnic" })).toBeTruthy();
     expect(screen.getAllByRole("heading", { name: /October|September|2026/ }).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("radio", { name: "Chill" }));

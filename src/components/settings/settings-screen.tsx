@@ -1,4 +1,5 @@
 "use client";
+import {IntimacySettings} from "@/components/intimacy/intimacy-settings";
 import Link from "next/link";
 import { useApp } from "@/components/app-provider";
 import { Notice, PageHeader } from "@/components/ui";
@@ -10,7 +11,7 @@ import { ProfileCard } from "./profile-card";
 
 /** /us/settings/: profile, look, shared couple details, account and data. */
 export function SettingsScreen() {
-  const { backend } = useApp();
+  const { backend, user } = useApp();
   return (
     <>
       <PageHeader title="Settings" subtitle="Your profile, your look, and the details you share." back={{ href: "/us/", label: "Us" }} />
@@ -20,6 +21,7 @@ export function SettingsScreen() {
         </Notice>
       ) : null}
       <ProfileCard />
+      <IntimacySettings key={user?.id}/>
       <LookCard />
       <CoupleCard />
       <Link

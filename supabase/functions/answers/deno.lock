@@ -94,7 +94,8 @@
   "workspace": {
     "dependencies": [
       "npm:@anthropic-ai/sdk@0.131.0",
-      "npm:@supabase/supabase-js@2.117.2"
+      "npm:@supabase/supabase-js@2.117.2",
+      "npm:zod@4.6.5"
     ]
   }
 }

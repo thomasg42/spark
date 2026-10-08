@@ -1,3 +1,5 @@
+import type {IntimacyApi} from '@shared/intimacy.ts';
+import type { DreamsApi } from "@shared/shared-dreams.ts";
 /**
  * The contract between the UI and data. Two implementations:
  *   live/  Supabase (Auth, Postgres + RLS, Storage) + Edge Functions for encryption and Claude
@@ -27,6 +29,7 @@ export interface SessionUser {
 }
 
 export interface Profile {
+  pronouns?: string | null;
   userId: string;
   displayName: string;
   nickname: string | null;
@@ -340,6 +343,8 @@ export interface DemoControls {
 }
 
 export interface Backend {
+  intimacy: IntimacyApi;
+  dreams: DreamsApi;
   readonly mode: "live" | "demo";
   readonly demo?: DemoControls;
 

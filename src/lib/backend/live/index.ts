@@ -1,3 +1,5 @@
+import {intimacy} from './intimacy';
+import { dreams } from "./shared-dreams";
 import type { Backend } from "../types";
 import { activities } from "./activities";
 import { answers } from "./answers";
@@ -19,5 +21,5 @@ import { pulse } from "./pulse";
 import { story } from "./story";
 
 export function createLiveBackend(): Backend {
-  return { mode: "live", auth, profiles, couple, media, story, answers, pulse, checkins, notes, activities, ideas, moments, buddy, datePlans, dateRules, lifeChanges, distanceFlags, projects, money };
+  return { mode: "live", intimacy, dreams, auth, profiles, couple, media, story, answers, pulse, checkins, notes, activities, ideas, moments, buddy, datePlans, dateRules, lifeChanges, distanceFlags, projects, money };
 }

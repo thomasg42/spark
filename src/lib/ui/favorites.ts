@@ -5,6 +5,7 @@
  * Buddy, Projects, Money) are, since they take an extra tap otherwise. Saved per person on this device.
  */
 export const FAVORITE_CATALOG = [
+  { id: "dreams", href: "/plans/dreams/", icon: "↗", title: "Shared Dreams" },
   { id: "buddy", href: "/us/buddy/", icon: "✦", title: "Spark Buddy" },
   { id: "projects", href: "/plans/projects/", icon: "🔨", title: "Projects" },
   { id: "money", href: "/plans/money/", icon: "💵", title: "Money" },

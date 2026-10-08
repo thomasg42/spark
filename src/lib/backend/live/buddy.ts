@@ -1,3 +1,4 @@
+import { dreams } from "./shared-dreams";
 import { isShareLevel, MESSAGE_MAX, SPEAK_CHUNK_MAX } from "@shared/buddy.ts";
 import { findQuestion } from "@shared/questionnaires.ts";
 import { UserFacingError, type Backend, type BuddySendResult, type BuddyShare, type BuddyTurn, type PartnerShare, type ShareTeaser, type StudioVoiceResult } from "../types";
@@ -25,7 +26,10 @@ export const buddy: Backend["buddy"] = {
     const text = (input.text ?? "").trim();
     if (!text) throw new UserFacingError("Say something first.");
     if (Array.from(text).length > MESSAGE_MAX) throw new UserFacingError("That's a lot at once. Try a shorter message.");
-    return invoke<BuddySendResult>("buddy", { action: "send", text, interviewQuestionId: input.interviewQuestionId, context: input.context, aiConsent: input.aiConsent === true });
+    const uid = await requireUserId();
+    const anchor = (await dreams.list()).items.find(x => x.kind === "anchors" && x.ownerId === uid);
+    const context = {...input.context, lifeAnchors: anchor?.kind === "anchors" ? anchor.payload : undefined};
+    return invoke<BuddySendResult>("buddy", { action: "send", text, interviewQuestionId: input.interviewQuestionId, context, aiConsent: input.aiConsent === true });
   },
   async shares() {
     await requireUserId();

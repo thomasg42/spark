@@ -51,3 +51,9 @@ verify_jwt = true
 
 [functions.buddy]
 verify_jwt = true
+
+[functions.shared-dreams]
+verify_jwt = true
+
+[functions.intimacy]
+verify_jwt = true

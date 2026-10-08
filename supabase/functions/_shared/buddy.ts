@@ -1,3 +1,4 @@
+import { coachSupport, coachingInstructions, payloadSchemas, reviewDraft, type LifeAnchors } from "./shared-dreams.ts";
 /**
  * Spark Buddy: each partner's personal assistant inside the app. It interviews
  * you to fill in your onboarding, coaches you about the relationship, proposes
@@ -368,6 +369,8 @@ export interface BuddyPerson {
  * partner. The partner's opt-in shares are added separately, on the server.
  */
 export interface BuddyClientContext {
+  /** Only the caller’s own Life Anchors, never their partner’s private reflection. */
+  lifeAnchors?: LifeAnchors;
   today: string; // YYYY-MM-DD
   me: BuddyPerson;
   partner: BuddyPerson | null;
@@ -408,6 +411,7 @@ export function sanitizeClientContext(raw: unknown): BuddyClientContext {
   };
   return {
     today,
+    lifeAnchors: payloadSchemas.anchors.safeParse(r.lifeAnchors).data,
     me: person(r.me) ?? { name: "You", birthday: null },
     partner: person(r.partner),
     city: str(r.city, 120) || null,
@@ -1024,6 +1028,9 @@ export function fallbackReply(req: BuddyRequest): BuddyReply {
   const ctx = req.context;
   const name = ctx.partner?.name ?? "your partner";
   if (mentionsCrisis(text)) return crisisReply();
+  const coaching = coachSupport(text, ctx.lifeAnchors?.track, ctx.lifeAnchors);
+  if (coaching.text.startsWith("I won't help")) return reply(coaching.text);
+  if (ctx.lifeAnchors && !req.interviewQuestionId && coaching.handled) return reply(coaching.text);
 
   // Answering the interview question on screen. A message that is itself a question
   // ("what's a good date idea?") is chat, not an answer, so it is never saved as one.
@@ -1203,6 +1210,7 @@ ${questionCatalog()}`;
     astrology_pairing: pairing,
     city: ctx.city,
     together_since: ctx.togetherSince,
+    my_life_anchors: ctx.lifeAnchors ?? null,
     my_answers: myAnswers,
     partner_shares: partnerShares,
     revealed_checkins: ctx.checkins,
@@ -1216,7 +1224,7 @@ ${questionCatalog()}`;
       : null,
   };
   const user = `Context (JSON):\n${JSON.stringify(details)}\n\nConversation so far (oldest first):\n${JSON.stringify(history)}\n\n${name} says: ${req.text.slice(0, MESSAGE_MAX)}`;
-  return { system, user };
+  return { system: system + "\n" + coachingInstructions(ctx.lifeAnchors?.track ?? "balanced"), user };
 }
 
 /** Converts Claude's flat action rows into validated actions. */
@@ -1225,6 +1233,8 @@ export function parseBuddyJson(json: unknown, req: BuddyRequest): BuddyReply | n
   const o = json as Record<string, unknown>;
   const text = typeof o.reply === "string" ? o.reply.trim() : "";
   if (!text) return null;
+  // Reject model-generated labels/blame; the built-in guide provides a safe reframe.
+  if (reviewDraft(text).needsReflection) return null;
   const today = req.context.today;
   const actions = (Array.isArray(o.actions) ? o.actions : []).map((raw) => {
     const a = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
