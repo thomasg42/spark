@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { LAST_TAB_KEY } from "@/lib/ui/last-tab";
+import { isBackSwipe, isBackTo, readStack, recordVisit, swipeBackTarget } from "@/lib/ui/nav-stack";
 import { useApp } from "./app-provider";
 import { CheckinPrompt } from "./checkin/checkin-prompt";
 import { cx } from "@/lib/ui/cx";
@@ -53,8 +54,9 @@ function DemoBar() {
 
 /**
  * A drill-down screen sits one level below a tab (for example /checkin/pulse/ or
- * /plans/ideas/). It opens full screen, sliding in from the right, with its own
- * back link, so the tab bar steps aside.
+ * /plans/ideas/). It slides in from the right with its own back link. The tab
+ * bar stays put so Home and every tab are one tap away (Thomas, 2026-10-08:
+ * "you can't just go back by hitting the home button").
  */
 export function isDrillDown(pathname: string): boolean {
   const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
@@ -64,8 +66,42 @@ export function isDrillDown(pathname: string): boolean {
 export function AppShell({ children }: { children: ReactNode }) {
   const { stage, profile, partner } = useApp();
   const pathname = usePathname() ?? "/";
+  const router = useRouter();
   const drill = stage === "ready" && isDrillDown(pathname);
-  const showTabs = stage === "ready" && !drill;
+  const showTabs = stage === "ready";
+
+  // The app's own back stack, so the back arrow, the tabs and swipe-back agree.
+  useEffect(() => {
+    recordVisit(pathname);
+  }, [pathname]);
+
+  // In the installed app (Home Screen) there is no browser swipe-back, so a swipe
+  // from the left edge goes back here. In Safari the browser's own swipe does it.
+  useEffect(() => {
+    if (stage !== "ready" || typeof window === "undefined") return;
+    const standalone = (navigator as Navigator & { standalone?: boolean }).standalone === true || window.matchMedia?.("(display-mode: standalone)").matches;
+    if (!standalone) return;
+    let start: { x: number; y: number } | null = null;
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      start = t && e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null;
+    };
+    const onEnd = (e: TouchEvent) => {
+      const t = e.changedTouches[0];
+      const from = start;
+      start = null;
+      if (!from || !t || !isBackSwipe(from, { x: t.clientX, y: t.clientY })) return;
+      const target = swipeBackTarget(readStack(), pathname, isDrillDown(pathname));
+      if (target === "history") window.history.back();
+      else if (target) router.push(target);
+    };
+    document.addEventListener("touchstart", onStart, { passive: true });
+    document.addEventListener("touchend", onEnd, { passive: true });
+    return () => {
+      document.removeEventListener("touchstart", onStart);
+      document.removeEventListener("touchend", onEnd);
+    };
+  }, [stage, pathname, router]);
 
   // Remember which tab a drill-down was opened from, so its back link can return there.
   useEffect(() => {
@@ -123,6 +159,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <li key={tab.href} className="flex-1">
                   <Link
                     href={tab.href}
+                    onClick={(e) => {
+                      // From an inner screen, its own tab goes BACK to the tab (no loop in history).
+                      if (isBackTo(readStack(), tab.href)) {
+                        e.preventDefault();
+                        window.history.back();
+                      }
+                    }}
                     aria-current={active ? "page" : undefined}
                     className={cx("flex min-h-16 flex-col items-center justify-center gap-0.5 text-xs font-semibold", active ? "text-accent-text" : "text-muted")}
                   >

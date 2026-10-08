@@ -8,8 +8,9 @@ import type { Question } from "@shared/questionnaires.ts";
 import type { ShareLevel } from "@shared/buddy.ts";
 
 const NEGATION = /\b(no|nope|nah|not|don'?t|do not|never|cancel|stop|wait|hold on|wrong|isn'?t|won'?t|nevermind|never mind)\b/i;
-const AFFIRM = "(?:yes|yeah|yep|yup|sure|ok|okay|perfect|great|absolutely|definitely|sounds good|that works|please do|go ahead|let'?s do it)";
-const ACT = "(?:do it|add it|send it|save it|book it|share it|go for it)";
+// "Yeah let's do that" is exactly how Thomas said yes to Buddy's offer (2026-10-08).
+const AFFIRM = "(?:yes|yeah|yep|yup|sure|ok|okay|perfect|great|absolutely|definitely|sounds good|sounds great|love it|that works|please do|go ahead|let'?s do (?:it|that|both|this))";
+const ACT = "(?:do it|do that|do both|add it|send it|save it|book it|share it|go for it)";
 // One or two affirmatives and/or an action ("yeah add it", "okay sounds good"), then optional politeness.
 const YES = new RegExp(`^(?:${AFFIRM}(?: ${AFFIRM})?(?: ${ACT})?|${ACT})(?: please| thanks| thank you| buddy)*$`, "i");
 const NO = /^(no|nope|nah|not now|no thanks|no thank you|skip it|cancel|never mind|nevermind|don'?t)( please| thanks| thank you| buddy)*$/i;

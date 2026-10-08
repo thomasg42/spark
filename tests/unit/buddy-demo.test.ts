@@ -28,10 +28,14 @@ describe("Spark Buddy in the demo", () => {
     const context = await contextFor(DEMO_ALEX);
     const { reply, notice } = await backend.buddy.send({ text: "I see Sam pulling away. Is this something I did?", interviewQuestionId: null, context, aiConsent: false });
     expect(notice).toMatch(/Demo mode/);
-    expect(reply.reply).toContain("When our plans kept getting moved for work.");
-    expect(reply.reply).toContain("Pull away to think");
-    expect(reply.reply).toContain("Plans that keep getting moved");
+    expect(reply.reply).toContain(`felt distant "when our plans kept getting moved for work"`);
+    expect(reply.actions.map((a) => a.type)).toEqual(["plan_date", "send_note"]);
     expect(reply.reply).not.toContain("Private sample answer");
+    // The rest of Sam's shares, on request: the approved hint only, never the raw answer.
+    const more = (await backend.buddy.send({ text: "What else did Sam share?", interviewQuestionId: null, context, aiConsent: false })).reply.reply;
+    expect(more).toContain("Pull away to think");
+    expect(more).toContain("Plans that keep getting moved");
+    expect(more).not.toContain("I start to feel like an afterthought");
     expect(reply.reply).not.toContain("I start to feel like an afterthought"); // Sam's raw trust_hurts answer stays private; only the approved hint is used
     expect(JSON.stringify(context)).not.toContain("Private sample");
     expect(reply.reply.length).toBeLessThan(1500); // nothing cut off

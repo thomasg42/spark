@@ -28,6 +28,15 @@ interface ChatItem extends BuddyTurn {
   key: string;
   actions?: BuddyAction[];
   crisis?: boolean;
+  /** Buddy's next question once this reply's offer is done ("stars, or something deeper?"). */
+  followUp?: string | null;
+}
+
+/** The offer Buddy just made out loud: one or two cards a plain "yes" does together. */
+interface PendingOffer {
+  key: string;
+  actions: BuddyAction[];
+  followUp: string | null;
 }
 
 const STARTERS = [
@@ -91,8 +100,8 @@ export function BuddyScreen() {
   const itemsRef = useRef<ChatItem[] | null>(null);
   itemsRef.current = items;
   const sendingRef = useRef(false);
-  /** The one suggestion Buddy just offered out loud ("Want me to do it? Just say yes."). */
-  const pendingConfirm = useRef<{ key: string; action: BuddyAction } | null>(null);
+  /** The suggestion Buddy just offered ("Want me to do that?"): a yes, spoken or typed, does it. */
+  const pendingConfirm = useRef<PendingOffer | null>(null);
   const handleSpokenRef = useRef<(heard: string) => Promise<void>>(async () => undefined);
   const voiceTurnRef = useRef<(opts?: { auto?: boolean }) => Promise<void>>(async () => undefined);
 
@@ -219,6 +228,14 @@ export function BuddyScreen() {
   async function send(raw: string, viaVoice = false) {
     const message = raw.trim();
     if (!message || sendingRef.current || !user) return;
+    // A typed "yes" to Buddy's offer does it, exactly like saying yes (spoken replies are routed in handleSpoken).
+    if (!viaVoice && pendingConfirm.current && parseConfirm(message)) {
+      voice.hush();
+      voiceMode.current = false;
+      setText("");
+      await answerOffer(message);
+      return;
+    }
     voiceMode.current = viaVoice;
     pendingConfirm.current = null; // a new message moves on from any earlier suggestion
     if (!viaVoice) voice.hush();
@@ -236,7 +253,7 @@ export function BuddyScreen() {
       // In the interview, an answer proposal fills the card (and saves it, with auto-save on).
       const answer = question ? reply.actions.find((a) => (a.type === "save_answer" || a.type === "skip_question") && a.questionId === question.id) : undefined;
       const rest = reply.actions.filter((a) => a !== answer);
-      const key = say(reply.reply, { actions: rest, crisis: reply.crisis });
+      const key = say(reply.reply, { actions: rest, crisis: reply.crisis, followUp: reply.followUp ?? null });
       // What Buddy says out loud: the reply, then whatever it is now waiting on.
       let spoken = reply.reply;
       if (reply.crisis) {
@@ -261,9 +278,13 @@ export function BuddyScreen() {
         spoken += ` ${questionToSpeech(question)}`;
       }
       if (reply.startInterview) spoken = startInterview(spoken);
-      if (rest.length === 1 && rest[0]!.type !== "open") {
-        pendingConfirm.current = { key, action: rest[0]! };
-        spoken += " Want me to do it? Just say yes.";
+      // One or two cards Buddy offered together ("calendar + note"): a single yes does both.
+      const doable = rest.filter((a) => a.type !== "open");
+      const asks = /\?["”]?\s*$/.test(reply.reply.trim());
+      const bundle = doable.length >= 1 && doable.length <= 2 ? doable : rest.length === 1 && asks ? rest : [];
+      if (bundle.length) {
+        pendingConfirm.current = { key, actions: bundle, followUp: reply.followUp ?? null };
+        if (!asks) spoken += bundle.length > 1 ? " Want me to do both? Just say yes." : " Want me to do it? Just say yes.";
       }
       void speakThenListen(spoken);
     } catch (e) {
@@ -275,9 +296,23 @@ export function BuddyScreen() {
     }
   }
 
-  async function confirm(item: ChatItem, action: BuddyAction, index: number): Promise<string | null> {
-    if (pendingConfirm.current?.action === action) pendingConfirm.current = null;
+  /** Removes one card by identity (indexes shift as cards are done one after another). */
+  function dropAction(itemKey: string, action: BuddyAction, extra: Partial<ChatItem> = {}) {
+    setItems((list) => (list ?? []).map((x) => (x.key === itemKey ? { ...x, ...extra, actions: x.actions?.filter((a) => a !== action) } : x)));
+    const offer = pendingConfirm.current;
+    if (offer?.key === itemKey && offer.actions.includes(action)) {
+      const left = offer.actions.filter((a) => a !== action);
+      pendingConfirm.current = left.length ? { ...offer, actions: left } : null;
+    }
+  }
+
+  /**
+   * Does one card. Tapping the last card of an offer also asks Buddy's follow-up
+   * question; `quiet` is for the spoken yes, which says everything in one breath.
+   */
+  async function confirm(item: ChatItem, action: BuddyAction, index: number, quiet = false): Promise<string | null> {
     if (action.type === "open") {
+      dropAction(item.key, action);
       router.push(NAV_HREF[action.to].href);
       return null;
     }
@@ -286,8 +321,15 @@ export function BuddyScreen() {
     try {
       const msg = await runAction(backend, action, partnerName);
       if (action.type === "save_answer") setDone((d) => new Set(d).add(action.questionId));
-      setItems((list) => (list ?? []).map((x) => (x.key === item.key ? { ...x, actions: x.actions?.filter((_, i) => i !== index) } : x)));
+      const latest = itemsRef.current?.find((x) => x.key === item.key) ?? item;
+      const lastOne = !(latest.actions ?? []).some((a) => a !== action && a.type !== "open");
+      const followUp = !quiet && lastOne ? latest.followUp : null;
+      dropAction(item.key, action, followUp ? { followUp: null } : {});
       if (msg) toast.show(msg);
+      if (followUp) {
+        say(followUp);
+        void speakThenListen(followUp);
+      }
       return msg || "Done.";
     } catch (e) {
       toast.show(messageOf(e), "error");
@@ -297,10 +339,44 @@ export function BuddyScreen() {
     }
   }
 
-  function dismiss(item: ChatItem, index: number) {
-    const action = item.actions?.[index];
-    if (action && pendingConfirm.current?.action === action) pendingConfirm.current = null;
-    setItems((list) => (list ?? []).map((x) => (x.key === item.key ? { ...x, actions: x.actions?.filter((_, i) => i !== index) } : x)));
+  function dismiss(item: ChatItem, action: BuddyAction) {
+    dropAction(item.key, action);
+  }
+
+  /** A yes or no (spoken or typed) to the offer Buddy just made. Returns false when there was none. */
+  async function answerOffer(said: string): Promise<boolean> {
+    const offer = pendingConfirm.current;
+    const answer = offer ? parseConfirm(said) : null;
+    if (!offer || !answer) return false;
+    pendingConfirm.current = null;
+    push({ role: "user", text: said, at: new Date().toISOString(), key: keyOf() });
+    const item = itemsRef.current?.find((x) => x.key === offer.key);
+    const open = offer.actions.filter((a) => item?.actions?.includes(a));
+    if (!item || !open.length) {
+      void speakThenListen("That one's already taken care of. What else?");
+      return true;
+    }
+    if (answer === "no") {
+      for (const action of open) dismiss(item, action);
+      say("No problem. What else?");
+      void speakThenListen("No problem. What else?");
+      return true;
+    }
+    const results: string[] = [];
+    for (const action of open) {
+      const msg = await confirm(item, action, item.actions?.indexOf(action) ?? 0, true);
+      if (msg) results.push(msg);
+      else if (action.type !== "open") {
+        void speakThenListen("Hmm, that didn't work. Check the screen.");
+        return true;
+      }
+    }
+    setItems((list) => (list ?? []).map((x) => (x.key === item.key ? { ...x, followUp: null } : x)));
+    const next = offer.followUp ?? "What else?";
+    const text = `Done! ${results.join(" ")} ${next}`.replace(/\s+/g, " ").trim();
+    say(text);
+    void speakThenListen(text);
+    return true;
   }
 
   /** One spoken turn: listen, then route what was heard (through the latest render's handler). */
@@ -357,21 +433,7 @@ export function BuddyScreen() {
       }
       return void speakThenListen("Sorry, was that off the table, a hint, or open?");
     }
-    const offer = pendingConfirm.current;
-    const answer = offer ? parseConfirm(heard) : null;
-    if (offer && answer) {
-      pendingConfirm.current = null;
-      const item = itemsRef.current?.find((x) => x.key === offer.key);
-      const index = item?.actions?.indexOf(offer.action) ?? -1;
-      userSaid();
-      if (!item || index < 0) return void speakThenListen("That one's already taken care of. What else?");
-      if (answer === "yes") {
-        const ok = await confirm(item, offer.action, index);
-        return void speakThenListen(ok ? `Done! ${ok}` : "Hmm, that didn't work. Check the screen.");
-      }
-      dismiss(item, index);
-      return void speakThenListen("No problem. What else?");
-    }
+    if (await answerOffer(heard)) return;
     await send(heard, true);
   }
   handleSpokenRef.current = handleSpoken;
@@ -505,7 +567,7 @@ export function BuddyScreen() {
                             {d.confirm}
                           </Button>
                           {action.type !== "open" ? (
-                            <Button variant="ghost" className="min-h-11" onClick={() => dismiss(item, index)}>
+                            <Button variant="ghost" className="min-h-11" onClick={() => dismiss(item, action)}>
                               Not now
                             </Button>
                           ) : null}
@@ -597,7 +659,8 @@ export function BuddyScreen() {
 
       <div ref={endRef} />
 
-      <form onSubmit={onSubmit} className="sticky bottom-0 mt-4 border-t border-line bg-bg/95 pb-4 pt-3 backdrop-blur">
+      {/* Sits just above the tab bar, which now stays on inner screens too. */}
+      <form onSubmit={onSubmit} className="sticky bottom-[calc(4rem+1px+env(safe-area-inset-bottom))] mt-4 border-t border-line bg-bg/95 pb-4 pt-3 backdrop-blur">
         {sendError ? <Notice tone="danger" className="mb-2" title={sendError} /> : null}
         {voiceError ? <Notice tone="danger" className="mb-2" title={voiceError} /> : null}
         {voiceHint ? <Notice className="mb-2">{voiceHint}</Notice> : null}
@@ -637,7 +700,7 @@ export function BuddyScreen() {
               <span aria-hidden className="buddy-talking flex items-end gap-0.5">
                 <span /> <span /> <span /> <span />
               </span>
-              Buddy is talking
+              Buddy is talking<span className="sr-only">. Tap Talk now to cut in.</span>
             </span>
             <button type="button" className="min-h-11 rounded-full border border-line px-4 text-sm font-semibold text-ink" onClick={() => {
                 voiceMode.current = false;
@@ -664,7 +727,7 @@ export function BuddyScreen() {
           </Button>
           {voice.canListen ? (
             <Button ref={talkRef} variant="secondary" aria-pressed={voice.listening} onClick={onTalk} aria-disabled={sending || undefined}>
-              {voice.listening ? "✓ Done talking" : "🎙 Talk"}
+              {voice.listening ? "✓ Done talking" : voice.speaking ? "✋ Talk now" : "🎙 Talk"}
             </Button>
           ) : null}
           {!interviewing ? (

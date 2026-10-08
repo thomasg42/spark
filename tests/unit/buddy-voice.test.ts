@@ -88,6 +88,7 @@ function harness() {
     onend: RecognitionLike["onend"] = null;
     started = false;
     stopped = false;
+    aborted = false;
     constructor() {
       instances.push(this);
     }
@@ -96,6 +97,9 @@ function harness() {
     }
     stop() {
       this.stopped = true;
+    }
+    abort() {
+      this.aborted = true;
     }
     say(words: string, isFinal: boolean) {
       this.onresult?.({ resultIndex: 0, results: { length: 1, 0: { isFinal, 0: { transcript: words } } } });
@@ -340,6 +344,8 @@ describe("iPhone speech reliability (Thomas, 2026-10-08: Buddy wasn't talking ba
   function engine() {
     const queued: Array<{ text: string; volume: number; fire: (ev: "start" | "end" | "error", data?: unknown) => void }> = [];
     let cancels = 0;
+    /** What the engine itself reports (iPhone can keep talking after the events we track). */
+    const flags = { speaking: false };
     class Utterance {
       text: string;
       rate = 1;
@@ -365,9 +371,14 @@ describe("iPhone speech reliability (Thomas, 2026-10-08: Buddy wasn't talking ba
       },
       cancel() {
         cancels++;
+        flags.speaking = false;
       },
+      get speaking() {
+        return flags.speaking;
+      },
+      pending: false,
     };
-    return { synth: synth as unknown as SpeechSynthesis, Utterance: Utterance as unknown as typeof SpeechSynthesisUtterance, queued, cancels: () => cancels };
+    return { synth: synth as unknown as SpeechSynthesis, Utterance: Utterance as unknown as typeof SpeechSynthesisUtterance, queued, cancels: () => cancels, flags };
   }
 
   it("keeps warming up on each tap until speech has really started, then stops", () => {
@@ -448,13 +459,91 @@ describe("iPhone speech reliability (Thomas, 2026-10-08: Buddy wasn't talking ba
       vi.unstubAllGlobals();
     }
   });
+
+  // Thomas, 2026-10-08: "I tried interrupting it after hitting Talk ... it just kept on talking over me",
+  // and the mic didn't hear him. Buddy was marked done while the phone was still talking, so Talk
+  // skipped the cancel and the mic opened under Buddy's voice.
+  it("stays 'talking' while the phone still is, past our own time estimate, until Stop or Talk silences it", async () => {
+    vi.useFakeTimers();
+    try {
+      const e = engine();
+      const speaker = createSpeaker({ synth: e.synth, Utterance: e.Utterance, createAudio: () => fakeAudio().el });
+      const p = speaker.speak("Hi there.");
+      await vi.advanceTimersByTimeAsync(0);
+      e.queued.at(-1)!.fire("start");
+      e.flags.speaking = true; // Safari dropped onend; the voice is still going
+      await vi.advanceTimersByTimeAsync(6000); // far past the ~1.7 s estimate for two words
+      expect(speaker.speaking).toBe(true); // so the Stop bar shows and hands-free never opens the mic under it
+      speaker.stop();
+      expect(e.cancels()).toBe(1);
+      await p;
+      expect(speaker.speaking).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never stays 'talking' for long on an engine whose speaking flag is stuck on", async () => {
+    vi.useFakeTimers();
+    try {
+      const e = engine();
+      const speaker = createSpeaker({ synth: e.synth, Utterance: e.Utterance, createAudio: () => fakeAudio().el });
+      const p = speaker.speak("Hi there.");
+      await vi.advanceTimersByTimeAsync(0);
+      e.queued.at(-1)!.fire("start");
+      e.flags.speaking = true; // and it never clears
+      await vi.advanceTimersByTimeAsync(9000); // about twice the words plus a margin
+      await p;
+      expect(speaker.speaking).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Stop or Talk right after a reply still silences a phone that hasn't finished", async () => {
+    const e = engine();
+    const speaker = createSpeaker({ synth: e.synth, Utterance: e.Utterance, createAudio: () => fakeAudio().el });
+    const p = speaker.speak("Hi there.");
+    await new Promise((r) => setTimeout(r, 0));
+    e.queued.at(-1)!.fire("start");
+    e.queued.at(-1)!.fire("end");
+    await p; // our bookkeeping says Buddy is done...
+    e.flags.speaking = true; // ...but the engine still reports talking
+    speaker.stop();
+    expect(e.cancels()).toBe(1);
+    // A moment after Buddy's last words, even an engine that says it's quiet gets silenced on Stop.
+    speaker.stop();
+    expect(e.cancels()).toBe(2);
+  });
+
+  it("a Stop before Buddy has ever spoken cancels nothing (that would undo the iPhone warm-up)", () => {
+    const e = engine();
+    const speaker = createSpeaker({ synth: e.synth, Utterance: e.Utterance, createAudio: () => fakeAudio().el });
+    speaker.unlock();
+    e.flags.speaking = true; // only the silent warm-up is in the engine
+    speaker.stop();
+    expect(e.cancels()).toBe(0);
+  });
+
+  it("a cancelled listening turn lets go of the mic at once; a finished one keeps the words", async () => {
+    const h = harness();
+    listenOnce({ Recognition: h.Recognition, now: h.now, every: h.every }).cancel();
+    expect(h.current.aborted).toBe(true);
+    const h2 = harness();
+    const turn = listenOnce({ Recognition: h2.Recognition, now: h2.now, every: h2.every });
+    h2.current.say("hello there", true);
+    turn.stop();
+    expect(h2.current.aborted).toBe(false);
+    expect(h2.current.stopped).toBe(true);
+    expect(await turn.result).toBe("hello there");
+  });
 });
 
 describe("understanding short spoken replies", () => {
   it("only an unambiguous yes counts as yes", () => {
-    for (const t of ["Yes", "yeah, add it!", "do it please", "Sounds good", "okay"]) expect(parseConfirm(t)).toBe("yes");
+    for (const t of ["Yes", "yeah, add it!", "do it please", "Sounds good", "okay", "Yeah let's do that.", "let's do both", "sounds great"]) expect(parseConfirm(t)).toBe("yes");
     for (const t of ["no", "Not now", "no thanks", "cancel"]) expect(parseConfirm(t)).toBe("no");
-    for (const t of ["not correct", "yes but not friday", "don't do it", "maybe", "yes wait", ""]) expect(parseConfirm(t)).not.toBe("yes");
+    for (const t of ["not correct", "yes but not friday", "don't do it", "maybe", "yes wait", "", "let's not do that", "yeah let's do that tomorrow instead"]) expect(parseConfirm(t)).not.toBe("yes");
   });
 
   it("maps spoken share levels, and never opens up an answer on a bare yes", () => {

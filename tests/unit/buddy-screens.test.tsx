@@ -8,7 +8,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { AppProvider } from "@/components/app-provider";
-import { ToastProvider } from "@/components/ui";
+import { PageHeader, ToastProvider } from "@/components/ui";
 import BuddyPage from "@/app/us/buddy/page";
 import BuddySharingPage from "@/app/us/buddy/sharing/page";
 import StarsPage from "@/app/us/stars/page";
@@ -51,6 +51,26 @@ describe("Spark Buddy screen", () => {
     fireEvent.click(screen.getByRole("button", { name: /Off the table \(default\)/ }));
     expect(await screen.findByText("How many brothers and sisters did you grow up with?")).toBeTruthy();
     expect(demoStore.get().buddyShares[DEMO_ALEX] ?? []).toEqual([]);
+  });
+
+  // Thomas, 2026-10-08: "What's my partner up to?" should get what Sam shared, one offer, and a
+  // question. "Yeah let's do that" does it, then Buddy asks: the stars, or something deeper?
+  it("answers 'what's my partner up to?', and a typed yes does the whole offer, then asks the follow-up", async () => {
+    renderApp(<BuddyPage />);
+    const box = await screen.findByLabelText("Talk to your Buddy");
+    const submit = () => fireEvent.click(within(box.closest("form")!).getByRole("button", { name: "Send" }));
+    fireEvent.change(box, { target: { value: "What's my partner up to?" } });
+    submit();
+    expect(await screen.findByText(/^Looking at what Sam chose to share/, {}, { timeout: 4000 })).toBeTruthy();
+    expect(screen.queryByText(/Here's what I can do/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Add it" })).toBeTruthy();
+    expect(screen.getByText("Note to Sam")).toBeTruthy();
+    fireEvent.change(box, { target: { value: "yeah let's do that" } });
+    submit();
+    await waitFor(() => expect(demoStore.get().datePlans.map((p) => p.title)).toEqual(["Date night, just us"]), { timeout: 4000 });
+    await waitFor(() => expect(demoStore.get().notes.some((n) => n.authorId === DEMO_ALEX && /Can I take you out/.test(n.body))).toBe(true));
+    expect(await screen.findByText(/^Done!.*(stars|deeper)/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Add it" })).toBeNull();
   });
 
   it("turns a suggestion into a card you confirm", async () => {
@@ -217,6 +237,20 @@ describe("talking with Buddy out loud", () => {
     expect(screen.queryByText("Listening…")).toBeNull();
   });
 
+  it("Talk while Buddy is talking cuts in: Buddy stops and the mic opens", async () => {
+    renderApp(<BuddyPage />);
+    const starter = await screen.findByRole("button", { name: "Plan a date night for us" });
+    holdSpeech = true;
+    fireEvent.click(starter);
+    await waitFor(() => expect(held.length).toBeGreaterThan(0), { timeout: 4000 }); // Buddy is mid-reply
+    const talkNow = await screen.findByRole("button", { name: "✋ Talk now" });
+    const before = recs.length;
+    fireEvent.click(talkNow);
+    expect(held).toHaveLength(0); // the speech engine was cancelled
+    expect(await screen.findByText("Listening…")).toBeTruthy();
+    expect(recs.length).toBe(before + 1);
+  });
+
   it("cancelling a listening turn is not an error", async () => {
     renderApp(<BuddyPage />);
     fireEvent.click(await screen.findByRole("button", { name: "🎙 Talk" }));
@@ -234,6 +268,37 @@ describe("talking with Buddy out loud", () => {
     expect(screen.getByText("Buddy's pick (the liveliest on this device)")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "▶ Hear Buddy" }));
     await waitFor(() => expect(spoken.join(" ")).toMatch(/Spark Buddy/));
+  });
+});
+
+describe("back arrow", () => {
+  it("goes BACK when it names the screen you came from, so swipe-back can't loop", () => {
+    sessionStorage.setItem("spark-nav-stack", JSON.stringify(["/us/", "/us/buddy/", "/us/buddy/sharing/"]));
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => undefined);
+    try {
+      render(<PageHeader title="What Buddy may share" back={{ href: "/us/buddy/", label: "Spark Buddy" }} />);
+      const link = screen.getByRole("link", { name: /Spark Buddy/ });
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+      link.dispatchEvent(event);
+      expect(back).toHaveBeenCalledTimes(1);
+      expect(event.defaultPrevented).toBe(true);
+    } finally {
+      back.mockRestore();
+    }
+  });
+
+  it("opens its target normally when you arrived another way", () => {
+    sessionStorage.setItem("spark-nav-stack", JSON.stringify(["/us/buddy/sharing/"]));
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => undefined);
+    try {
+      render(<PageHeader title="What Buddy may share" back={{ href: "/us/buddy/", label: "Spark Buddy" }} />);
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+      screen.getByRole("link", { name: /Spark Buddy/ }).dispatchEvent(event);
+      expect(back).not.toHaveBeenCalled();
+      expect(event.defaultPrevented).toBe(false);
+    } finally {
+      back.mockRestore();
+    }
   });
 });
 

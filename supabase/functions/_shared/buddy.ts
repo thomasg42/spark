@@ -477,6 +477,12 @@ export interface BuddyReply {
   /** Ask the UI to start (or resume) the onboarding interview. */
   startInterview: boolean;
   meta: BuddyMeta | null;
+  /**
+   * What Buddy asks next once the person says yes to this reply's offer (e.g.
+   * "want me to look at your stars, or is this something deeper?"). One natural
+   * next choice, never a menu.
+   */
+  followUp?: string | null;
 }
 
 export interface BuddyRequest {
@@ -633,7 +639,6 @@ export function validateActions(list: unknown, today: string, goals: BuddyClient
 // What the Buddy can say about the partner (shares + revealed data only)
 // ---------------------------------------------------------------------------
 
-const daysBetweenIso = (a: string, b: string) => Math.round((dayFromIso(b).getTime() - dayFromIso(a).getTime()) / 86_400_000);
 const NOTHING = /^\s*(not really|no|nope|nothing|none|n\/a|-)\.?\s*$/i;
 
 export interface Charts {
@@ -682,19 +687,9 @@ function pulseLine(ctx: BuddyClientContext, name: string): string | null {
   if (theirs.length < 2) return null;
   const last = theirs[theirs.length - 1]!;
   const before = theirs[theirs.length - 2]!;
-  if (last.connection < before.connection) return `${name}'s connection score dipped from ${before.connection} to ${last.connection} in your latest shared quick check-in.`;
-  if (last.connection <= 2) return `${name}'s connection score was ${last.connection} of 5 in your latest shared quick check-in.`;
+  if (last.connection < before.connection) return `${name}'s connection score dipped from ${before.connection} to ${last.connection} in your latest quick check-in.`;
+  if (last.connection <= 2) return `${name}'s connection score was ${last.connection} of 5 in your latest quick check-in.`;
   return null;
-}
-
-function dateGapLine(ctx: BuddyClientContext): string | null {
-  const upcoming = ctx.plans.filter((p) => p.plannedFor >= ctx.today).sort((a, b) => (a.plannedFor < b.plannedFor ? -1 : 1))[0];
-  const last = [...ctx.activities].sort((a, b) => (a.happenedOn < b.happenedOn ? 1 : -1))[0];
-  const gap = last ? daysBetweenIso(last.happenedOn, ctx.today) : null;
-  if (upcoming) return null;
-  if (gap === null) return "Nothing is on the calendar yet that's just the two of you.";
-  if (gap >= 10) return `Your last logged date was ${gap} days ago, and nothing is on the calendar that's just the two of you.`;
-  return "Nothing is on the calendar yet that's just the two of you.";
 }
 
 // ---------------------------------------------------------------------------
@@ -705,24 +700,39 @@ const INTENTS = {
   onboarding: /\b(onboard|fill (it |them |everything |my )?(out|in)|get to know|interview|my questions|start (the )?questions|answer (the )?questions|itinerary)\b/i,
   distance: /\b(pull(ing)? away|distant|distance|something i did|did i do|mad at me|upset with me|off lately|seems off|cold lately|disconnected|drifting|not (herself|himself|themselves)|what'?s wrong|is (she|he|they) (ok|okay|happy))\b/i,
   date: /\b(date night|date|plan (a|our|some) (date|night|time)|go out|just (us|the two of us|me and (her|him|them))|quality time|schedule (a|some)|book (a|some)|time together|a day where)\b/i,
-  stars: /\b(astrolog|zodiac|horoscope|sign|signs|numerolog|life path|stars|compatib)\w*\b/i,
+  stars: /\b(astrolog|zodiac|horoscope|sign|signs|numerolog|life path|stars|compatib|timing thing|timing issue)\w*\b/i,
   likes: /\b(what (does|would) (she|he|they|\w+) (like|love|want)|love language|make (her|him|them) (happy|feel loved)|gift|surprise (her|him|them))\b/i,
   note: /\b(send (her|him|them|\w+) (a )?(note|message)|thank (her|him|them)|appreciat|tell (her|him|them) (that|i))\b/i,
   sharing: /\b(what can (she|he|they|\w+) see|privacy|private|share|sharing|off the table|hint mode|transparent)\b/i,
   projects: /\b(projects?|to-?do|working on|priorit\w*|garage|remodel\w*|paint\w*|nursery|baby'?s room|kid'?s room)\b/i,
   money: /\b(money|financ\w*|sav(e|ed|ing|ings)|budget\w*|afford|income|bills?|fund)\b/i,
+  help: /\b(help|what can you do|what do you do|how does this work|what are my options|menu)\b/i,
+  more: /\b(what else|tell me more|anything else (did|has)|what more)\b/i,
+  deeper: /\b(deeper|something (bigger|more|else going on)|more than (that|the stars|timing)|in-?depth|real (problem|issue)|serious|not (the|a) (stars|timing))\b/i,
 };
 
+const PARTNER_WORDS = "my partner|my (?:wife|husband|girlfriend|boyfriend|fianc[eé]e?|spouse|other half|person)|she|he|they|her|him|them|bae|babe";
+const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** "What's Sam up to?", "How's my partner doing?", "What's going on with her?", "Catch me up." */
+export function asksAboutPartner(text: string, partnerName: string | null | undefined): boolean {
+  const names = [partnerName?.trim()].filter((n): n is string => !!n && n.length > 1).map(escapeRe);
+  const who = `(?:${[...names, PARTNER_WORDS].join("|")})`;
+  return (
+    new RegExp(`\\b(?:what'?s|what is|what has|how'?s|how is|how has|how are)\\s+${who}(?=[\\s?.!,]|$)`, "i").test(text) ||
+    new RegExp(`\\b(?:going on|new|up) with\\s+${who}\\b`, "i").test(text) ||
+    /\b(catch me up|fill me in|any(thing)? (news|new)|update on)\b/i.test(text)
+  );
+}
+
+/** Only when asked what Buddy can do: a sentence, not a feature list (Thomas, 2026-10-08). */
 function helpReply(partnerName: string): string {
-  return [
-    "I'm your Spark Buddy. Here's what I can do:",
-    `• Fill in your onboarding with you, one easy question at a time. Just talk and I'll fill in the answers.`,
-    `• Help you understand what's going on with ${partnerName}, using only what ${partnerName} chose to share and what you've both revealed in check-ins.`,
-    "• Put a date night on your shared calendar, or send a quick note.",
-    "• Keep your projects in priority order and track savings, yours and joint.",
-    "• Walk you through your astrology and numbers as a couple.",
-    "Try: \"Let's fill out my onboarding\" or \"Is something off with us?\"",
-  ].join("\n");
+  return `I can catch you up on what ${partnerName} chose to share, plan a date, send ${partnerName} a quick note, keep your projects and savings on track, or go through your onboarding with you. What's on your mind?`;
+}
+
+/** Anything Buddy didn't follow: one short question back, never the whole menu. */
+function clarifyReply(partnerName: string): string {
+  return `Tell me a bit more. Is this about ${partnerName}, something to plan for the two of you, or just something on your mind?`;
 }
 
 const NO_PARTNER_SHARES = (name: string) =>
@@ -744,6 +754,10 @@ export function crisisReply(): BuddyReply {
   );
 }
 
+const lowerFirst = (t: string) => (t ? t[0]!.toLowerCase() + t.slice(1) : t);
+/** A partner's own words, trimmed for saying out loud inside quotes. */
+const quoted = (t: string) => `"${lowerFirst(t.trim().replace(/[.!\s]+$/, ""))}"`;
+
 function astroReply(ctx: BuddyClientContext): BuddyReply {
   const { me, partner } = chartsFor(ctx);
   const partnerName = ctx.partner?.name ?? "your partner";
@@ -752,37 +766,103 @@ function astroReply(ctx: BuddyClientContext): BuddyReply {
   const pairing = couplePairing(me, partner);
   return reply(
     [
-      `You're a ${me.sun.name} ${me.sun.symbol} (${me.sun.element}), Life Path ${me.lifePath}. ${partnerName} is a ${partner.sun.name} ${partner.sun.symbol} (${partner.sun.element}), Life Path ${partner.lifePath}.`,
-      `Strength: ${pairing.elements.strength}`,
-      `Watch out for: ${pairing.watchOuts[0]}`,
-      `Keep it from getting old: ${pairing.elements.keepItFresh}`,
+      `You're a ${me.sun.name} ${me.sun.symbol}, Life Path ${me.lifePath}, and ${partnerName} is a ${partner.sun.name} ${partner.sun.symbol}, Life Path ${partner.lifePath}.`,
+      `Your strength together: ${lowerFirst(pairing.elements.strength)}`,
+      `One thing to watch: ${lowerFirst(pairing.watchOuts[0] ?? "")}`,
       ASTRO_FRAMING,
-    ].join("\n"),
+      "Want the full reading?",
+    ].join(" "),
     { actions: [{ type: "open", to: "stars" }] },
   );
 }
 
-function distanceReply(ctx: BuddyClientContext, shares: PartnerShare[]): BuddyReply {
-  const name = ctx.partner?.name ?? "your partner";
-  const evidence = [
-    ...checkinLines(ctx, name),
-    ...orderedShares(shares, RELEVANT_TO_DISTANCE).slice(0, 4).map((s) => shareLine(name, s)),
-  ];
+/** What the partner chose to share, most relevant first. Never anything else. */
+function partnerFacts(ctx: BuddyClientContext, shares: PartnerShare[], name: string): { facts: string[]; distant: boolean } {
+  const latest = [...ctx.checkins].sort((a, b) => (a.period < b.period ? 1 : -1))[0];
+  const said = (t: string | undefined) => !!t && !NOTHING.test(t);
+  const facts: string[] = [];
+  let distant = false;
+  if (latest && said(latest.partner.distant)) {
+    facts.push(`In your last check-in, ${name} said they felt distant ${quoted(latest.partner.distant)}`);
+    distant = true;
+  }
   const pulse = pulseLine(ctx, name);
-  if (pulse) evidence.push(pulse);
-  const gap = dateGapLine(ctx);
-  if (gap) evidence.push(gap);
-  const { me, partner } = chartsFor(ctx);
-  const watch = me && partner ? couplePairing(me, partner).watchOuts[0] : null;
+  if (pulse) {
+    facts.push(pulse.replace(/\.$/, ""));
+    distant = true;
+  }
+  for (const share of orderedShares(shares, RELEVANT_TO_DISTANCE)) facts.push(shareLine(name, share).replace(/\.$/, ""));
+  if (latest && said(latest.partner.more_of)) facts.push(`${name} would love more of ${quoted(latest.partner.more_of)}`);
+  if (latest && said(latest.partner.talk_about)) facts.push(`${name} wants to talk about ${quoted(latest.partner.talk_about)}`);
+  return { facts, distant };
+}
 
-  const lines = [
-    "It takes care to ask that. I can't see anything " + name + " keeps off the table, but here's what " + name + " chose to share and what you've both revealed:",
-    ...(evidence.length ? evidence.map((e) => `• ${e}`) : [`• ${NO_PARTNER_SHARES(name)}`]),
-  ];
-  if (!shares.length && evidence.length) lines.push(NO_PARTNER_SHARES(name));
-  if (watch) lines.push(`Astrology lens: ${watch}`);
-  lines.push(`My suggestion: ask ${name} one open question tonight, like "What's one thing that would make this week feel better for you?", and then set aside a day that's just the two of you. What day works? I'll put it on your calendar.`);
-  return reply(lines.join("\n"), { meta: { awaiting: "plan_day", planTitle: "Date night, just us" } });
+const dayLabel = (iso: string) => dayFromIso(iso).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
+
+/**
+ * "What's Sam up to?" / "Is it something I did?" (Thomas, 2026-10-08): answer the
+ * question like a friend would. What Sam chose to share in a sentence or two,
+ * a gentle read grounded only in that, then ONE offer that fits, asked as a
+ * question so a plain "yes" can do it. The follow-up choice comes after the yes.
+ */
+function partnerReply(ctx: BuddyClientContext, shares: PartnerShare[], worried: boolean): BuddyReply {
+  const name = ctx.partner?.name ?? "your partner";
+  const { facts: all, distant } = partnerFacts(ctx, shares, name);
+  const facts = all.slice(0, 2); // two things, said like a person would; "what else?" gets the rest
+  const parts: string[] = [];
+  if (worried) parts.push("It takes care to ask that.");
+  if (!facts.length) {
+    parts.push(`${name} hasn't shared anything with their Buddy yet, and there's no check-in to go on, so I can't tell you much.`);
+    parts.push(`The surest way to know is to ask ${name} directly, like "How's your week really going?"`);
+  } else {
+    parts.push(shares.length ? `Looking at what ${name} chose to share: ${facts[0]}.` : `${name} hasn't shared anything with their Buddy yet, but from your check-ins: ${facts[0]}.`);
+    if (facts[1]) parts.push(`Also, ${facts[1]}.`);
+    if (distant) parts.push(`Sounds like ${name} could use some time with just you.`);
+  }
+
+  const { me, partner } = chartsFor(ctx);
+  const followUp = me && partner
+    ? "While we're at it, want me to look at your stars to see if it's a timing thing? Or does this feel like something deeper?"
+    : `Is anything deeper going on that you want to talk through?`;
+
+  const upcoming = ctx.plans.filter((p) => p.plannedFor >= ctx.today).sort((a, b) => (a.plannedFor < b.plannedFor ? -1 : 1))[0];
+  if (upcoming) {
+    const note = `Can't wait for ${upcoming.title.toLowerCase()} on ${dayLabel(upcoming.plannedFor).split(",")[0]}.`.slice(0, NOTE_BODY_MAX);
+    const action = validateAction({ type: "send_note", body: note }, ctx.today);
+    parts.push(`You already have "${upcoming.title}" on ${dayLabel(upcoming.plannedFor)}. Want me to send ${name} a quick note: "${note}"?`);
+    return reply(parts.join(" "), { actions: action ? [action] : [], followUp });
+  }
+
+  const title = "Date night, just us";
+  const date = suggestDay(ctx);
+  const weekday = dayLabel(date).split(",")[0]!;
+  const note = `Thinking of you. Can I take you out ${weekday} night, just us?`;
+  const actions = [
+    validateAction({ type: "plan_date", title, date, time: "19:00", note: null }, ctx.today),
+    validateAction({ type: "send_note", body: note }, ctx.today),
+  ].filter((a): a is BuddyAction => a !== null);
+  parts.push(`I can put a date night on the calendar for ${weekday} at 7 and send ${name} a note: "${note}" Want me to do that?`);
+  return reply(parts.join(" "), { actions, followUp, meta: { awaiting: "plan_day", planTitle: title } });
+}
+
+/** "What else did Sam share?": the rest, a few at a time. */
+function partnerMoreReply(ctx: BuddyClientContext, shares: PartnerShare[]): BuddyReply {
+  const name = ctx.partner?.name ?? "your partner";
+  const more = partnerFacts(ctx, shares, name).facts.slice(2, 8);
+  if (!more.length) return reply(`That's everything ${name} has chosen to share for now. Want to plan something, or talk it through?`);
+  return reply(`${more.map((f) => `${f}.`).join(" ")} Anything there you want to act on?`);
+}
+
+/** "It feels deeper than that": a way into the real conversation, not a horoscope. */
+function deeperReply(ctx: BuddyClientContext): BuddyReply {
+  const name = ctx.partner?.name ?? "your partner";
+  const latest = [...ctx.checkins].sort((a, b) => (a.period < b.period ? 1 : -1))[0];
+  const topic = latest?.partner.talk_about && !NOTHING.test(latest.partner.talk_about) ? latest.partner.talk_about : null;
+  const parts = ["Then it's worth a real conversation, not a horoscope."];
+  if (topic) parts.push(`${name} said they want to talk about ${quoted(topic)}, which is a natural place to start.`);
+  parts.push(`Try asking ${name}, "What's one thing that would make this week feel better for you?" and just listen, no fixing.`);
+  parts.push("Your monthly check-in is a safe place for the bigger stuff too. Want to open it?");
+  return reply(parts.join(" "), { actions: [{ type: "open", to: "checkin" }] });
 }
 
 function likesReply(ctx: BuddyClientContext, shares: PartnerShare[]): BuddyReply {
@@ -910,7 +990,8 @@ function lastBuddyMeta(history: BuddyTurn[]): BuddyMeta | null {
 
 /** Rule-based Buddy: understands the core intents and always respects the share levels. */
 export function fallbackReply(req: BuddyRequest): BuddyReply {
-  const text = (req.text ?? "").trim().slice(0, MESSAGE_MAX);
+  // Phone keyboards and dictation type curly apostrophes ("What’s"): the patterns use straight ones.
+  const text = (req.text ?? "").replace(/[\u2018\u2019]/g, "'").trim().slice(0, MESSAGE_MAX);
   const ctx = req.context;
   const name = ctx.partner?.name ?? "your partner";
   if (mentionsCrisis(text)) return crisisReply();
@@ -945,7 +1026,7 @@ export function fallbackReply(req: BuddyRequest): BuddyReply {
   if (INTENTS.onboarding.test(text)) {
     return reply(`Let's do it. I'll ask you about 20 easy questions, one at a time. Just answer like you're talking to a friend, and I'll fill everything in. You can skip anything.`, { startInterview: true });
   }
-  if (INTENTS.distance.test(text)) return distanceReply(ctx, req.partnerShares);
+  if (INTENTS.distance.test(text)) return partnerReply(ctx, req.partnerShares, true);
   if (INTENTS.date.test(text)) {
     const planned = planFrom(text, ctx, "Date night, just us");
     if (planned) return planned;
@@ -954,6 +1035,9 @@ export function fallbackReply(req: BuddyRequest): BuddyReply {
   if (ASKS_FOR_A_DAY.test(text)) return suggestPlan(ctx, "Date night, just us");
   if (INTENTS.stars.test(text)) return astroReply(ctx);
   if (INTENTS.likes.test(text)) return likesReply(ctx, req.partnerShares);
+  if (INTENTS.deeper.test(text)) return deeperReply(ctx);
+  if (INTENTS.more.test(text) && (asksAboutPartner(text, ctx.partner?.name) || new RegExp(`\\b(share|shared|${escapeRe(name)})\\b`, "i").test(text))) return partnerMoreReply(ctx, req.partnerShares);
+  if (asksAboutPartner(text, ctx.partner?.name)) return partnerReply(ctx, req.partnerShares, false);
   if (INTENTS.note.test(text)) {
     const quoted = /["“](.+?)["”]/.exec(text)?.[1] ?? /\b(?:saying|that)\s+(.{3,})$/i.exec(text)?.[1];
     const action = quoted ? validateAction({ type: "send_note", body: quoted.trim().slice(0, NOTE_BODY_MAX) }, ctx.today) : null;
@@ -965,8 +1049,10 @@ export function fallbackReply(req: BuddyRequest): BuddyReply {
   if (INTENTS.money.test(text)) return moneyReply(ctx, text);
   if (INTENTS.projects.test(text)) return projectsReply(ctx);
   if (INTENTS.sharing.test(text)) return sharingReply(ctx);
-  // A bare day after the date question (e.g. "Saturday") is handled above; anything else gets help.
-  return reply(helpReply(name));
+  if (INTENTS.help.test(text)) return reply(helpReply(name));
+  // A bare day after the date question (e.g. "Saturday") is handled above. Anything else
+  // gets one short question back, never the whole menu (Thomas, 2026-10-08).
+  return reply(clarifyReply(name));
 }
 
 // ---------------------------------------------------------------------------
@@ -982,9 +1068,10 @@ const ACTION_TYPES = ["save_answer", "skip_question", "set_share", "plan_date", 
 export const BUDDY_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["reply", "start_interview", "actions"],
+  required: ["reply", "start_interview", "actions", "follow_up"],
   properties: {
-    reply: { type: "string", description: "What Buddy says. Warm, plain, 1 to 6 short sentences or bullet lines." },
+    reply: { type: "string", description: "What Buddy says out loud. Answers the actual question first, like a friend talking: 1 to 4 short sentences, no lists unless asked for one, ending with one question when offering something." },
+    follow_up: { type: "string", description: "Only when the reply offers to do something: the ONE natural next question Buddy asks after the person says yes (for example a choice between two directions). Else empty." },
     start_interview: { type: "boolean", description: "True only when the person asks to fill in their onboarding questions." },
     actions: {
       type: "array",
@@ -1059,7 +1146,13 @@ Actions:
 - log_savings: record money saved toward (or taken out of) a goal listed in money with whose "joint" or "mine". Never a goal marked "partner".
 - open: link to a screen (sharing, stars, questions, ideas, checkin, projects, money).
 Money: be practical and encouraging. Do the math from the numbers given (progress, monthly amount to reach a target by its date). You are not a licensed financial advisor; for investing, debt or tax decisions, suggest a professional.
-Keep replies short and human. Use ${partnerName}'s name, not pronouns you'd have to guess. No markdown headings.
+How you talk (every reply is also read aloud, Thomas 2026-10-08):
+- Answer exactly what ${name} asked, first, in 1 to 4 short sentences, like a friend talking out loud. Never list what you can do unless ${name} asks what you can do. No bullet lists unless ${name} asks for a list.
+- Follow ${name}'s lead. Respond to what they just said, not to a script, and don't repeat a suggestion they already answered.
+- When ${name} asks about ${partnerName} ("what's ${partnerName} up to?", "is it something I did?"): say in plain words what ${partnerName} chose to share or said in check-ins ("Looking at what ${partnerName} shared, ..."), at most two things, then offer ONE concrete next step that fits, asked as a question ("Want me to put a date night on the calendar and send ${partnerName} a quick note?"). Attach the matching actions so a yes can do it, and read any note you propose out loud word for word.
+- Put the one natural next question for after a yes in follow_up (for example "Want me to look at your stars to see if it's a timing thing, or does this feel like something deeper?"). A choice between two directions, never a menu.
+- If you didn't follow, ask one short question back.
+- Use ${partnerName}'s name, not pronouns you'd have to guess. No markdown headings.
 
 Question list:
 ${questionCatalog()}`;
@@ -1140,6 +1233,7 @@ export function parseBuddyJson(json: unknown, req: BuddyRequest): BuddyReply | n
   if (req.interviewQuestionId) {
     valid = valid.filter((a) => (a.type !== "save_answer" && a.type !== "skip_question") || a.questionId === req.interviewQuestionId);
   }
+  const followUp = typeof o.follow_up === "string" ? o.follow_up.trim().slice(0, 300) : "";
   return {
     reply: text.slice(0, REPLY_MAX),
     actions: valid.slice(0, MAX_ACTIONS),
@@ -1147,6 +1241,7 @@ export function parseBuddyJson(json: unknown, req: BuddyRequest): BuddyReply | n
     crisis: false,
     startInterview: o.start_interview === true,
     meta: null,
+    followUp: followUp || null,
   };
 }
 

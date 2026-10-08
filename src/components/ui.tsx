@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ButtonHTMLAttributes, type ReactNode, type Ref } from "react";
 import { LAST_TAB_KEY, resolveBack } from "@/lib/ui/last-tab";
+import { isBackTo, readStack } from "@/lib/ui/nav-stack";
 
 import { cx } from "@/lib/ui/cx";
 export { cx };
@@ -68,7 +69,18 @@ export function PageHeader({ title, subtitle, back: defaultBack, action }: { tit
   return (
     <header className="mb-5 fade-up">
       {back ? (
-        <Link href={back.href} className="mb-2 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-accent-text">
+        <Link
+          href={back.href}
+          onClick={(e) => {
+            // Go BACK when this is the screen you came from, so the phone's swipe-back
+            // never loops into the screen you just left (Thomas, 2026-10-08).
+            if (isBackTo(readStack(), back.href)) {
+              e.preventDefault();
+              window.history.back();
+            }
+          }}
+          className="mb-2 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-accent-text"
+        >
           <span aria-hidden>‹</span> {back.label}
         </Link>
       ) : null}

@@ -53,6 +53,10 @@ export type SpeechTrouble = "blocked" | "silent" | null;
 
 /** How long speech may take to start before we say something is wrong. */
 export const START_WATCHDOG_MS = 4000;
+/** Longest Buddy may stay "talking" on one chunk while the engine still reports speech. */
+export const ENGINE_DRAIN_MAX_MS = 30000;
+/** A Stop this soon after Buddy's last words also silences the engine (iPhone can still be talking). */
+export const RECENT_SPEECH_MS = 20000;
 
 export interface Speaker {
   /** Call from inside a tap/keypress so later speech is allowed to play (iOS). */
@@ -96,7 +100,17 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
   /** An utterance of OURS is queued or speaking (never cancel a silent warm-up). */
   let deviceInFlight = 0;
   let lastCancelAt = -Infinity;
+  /** When an utterance of ours last settled (by event or by our own time limit). */
+  let lastOwnEndAt = -Infinity;
   const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+  /** What the speech engine itself reports, which outlives our bookkeeping when Safari drops events. */
+  const engineBusy = () => {
+    try {
+      return !!synth && (synth.speaking === true || synth.pending === true);
+    } catch {
+      return false;
+    }
+  };
 
   const setSpeaking = (value: boolean) => {
     if (speaking === value) return;
@@ -209,8 +223,23 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
       } else u.lang = "en-US";
       let done = false;
       let started = false;
-      // Safari drops onend often enough to stall a conversation: never wait longer than the words could take.
-      const ceiling = setTimeout(() => end(true), Math.min(20000, 900 + text.length * 90));
+      const begun = now();
+      const estimateMs = Math.min(20000, 900 + text.length * 90);
+      // Some iOS versions leave speechSynthesis.speaking stuck on: never wait more than about twice the words.
+      const drainUntil = Math.min(ENGINE_DRAIN_MAX_MS, estimateMs * 2 + 4000);
+      // Safari drops onend often enough to stall a conversation: never wait much longer than the words
+      // could take. But while the engine still reports talking, Buddy IS still talking (Thomas,
+      // 2026-10-08: it "kept on talking over me" because we had already marked it done and Talk
+      // then skipped the cancel). Keep waiting for real quiet, up to a hard limit.
+      const settleWhenQuiet = () => {
+        if (done) return;
+        if (started && mine === token && engineBusy() && now() - begun < drainUntil) {
+          ceiling = setTimeout(settleWhenQuiet, 250);
+          return;
+        }
+        end(true);
+      };
+      let ceiling = setTimeout(settleWhenQuiet, estimateMs);
       // Speech that never starts (silent switch, refused, stuck engine) must not leave Buddy "talking" in silence.
       const watchdog = setTimeout(() => {
         if (!started && !done) {
@@ -225,6 +254,7 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
         clearTimeout(watchdog);
         alive.delete(u);
         deviceInFlight = Math.max(0, deviceInFlight - 1);
+        if (started) lastOwnEndAt = now();
         if (release === endInterrupted) release = null;
         resolve(ok);
       };
@@ -288,7 +318,13 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
     }
   }
 
-  function haltCurrent() {
+  /**
+   * userStop: the person pressed Stop or Talk (or Esc). Then the engine is also
+   * silenced if it still reports talking, or if Buddy spoke moments ago: on an
+   * iPhone the voice can outlast the events we track, and a Talk that skipped the
+   * cancel left Buddy talking over the person while the mic heard nothing.
+   */
+  function haltCurrent(userStop = false) {
     if (audio) {
       try {
         audio.pause();
@@ -296,9 +332,10 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
         // ignore
       }
     }
-    // Only cancel when our own speech is queued or playing: cancelling a silent
-    // warm-up (or nothing) can undo the iOS prime or swallow the next reply.
-    if (synth && deviceInFlight > 0) {
+    // Otherwise only cancel when our own speech is queued or playing: cancelling a
+    // silent warm-up (or nothing) can undo the iOS prime or swallow the next reply.
+    const ours = deviceInFlight > 0 || (primed && (engineBusy() || (userStop && now() - lastOwnEndAt < RECENT_SPEECH_MS)));
+    if (synth && ours) {
       try {
         synth.cancel();
         lastCancelAt = now();
@@ -315,7 +352,7 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
 
   function stop() {
     token++;
-    haltCurrent();
+    haltCurrent(true);
     setSpeaking(false);
   }
 

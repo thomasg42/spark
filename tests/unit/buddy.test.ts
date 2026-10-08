@@ -182,13 +182,59 @@ describe("share levels", () => {
 describe("the go-between", () => {
   it("answers 'is it something I did?' only from shares and revealed check-ins, then offers a day", () => {
     const r = fallbackReply(request("I see my wife pulling away. Is this something I did?"));
-    expect(r.reply).toContain("When our plans kept getting moved for work.");
-    expect(r.reply).toContain("Date nights that are just us.");
-    expect(r.reply).toContain("Pull away to think");
-    expect(r.reply).toContain("Unhurried evenings");
+    expect(r.reply).toContain(`felt distant "when our plans kept getting moved for work"`);
     expect(r.reply).toMatch(/dipped from 5 to 3/);
     expect(r.meta?.awaiting).toBe("plan_day");
     expect(r.crisis).toBe(false);
+  });
+
+  // Thomas, 2026-10-08: "I just asked a plain simple question, 'What's my partner up to?' It told
+  // me everything I could do." Buddy answers the question, offers ONE thing, and asks.
+  it("answers 'what's my partner up to?' like a friend: two things shared, a read, one offer, a question", () => {
+    for (const ask of ["What's my partner up to?", "What’s Amy up to?", "how is amy doing", "What's going on with her?", "Catch me up"]) {
+      const r = fallbackReply(request(ask));
+      expect(r.reply, ask).toMatch(/^Looking at what Amy chose to share: In your last check-in, Amy said they felt distant/);
+      expect(r.reply, ask).not.toMatch(/Here's what I can do|•/);
+      expect(r.reply.trim(), ask).toMatch(/Want me to do that\?$/);
+    }
+    const r = fallbackReply(request("What's my partner up to?"));
+    expect(r.reply).toContain("Sounds like Amy could use some time with just you.");
+    expect(r.reply).toContain(`date night on the calendar for Friday at 7 and send Amy a note: "Thinking of you. Can I take you out Friday night, just us?"`);
+    expect(r.actions).toEqual([
+      { type: "plan_date", title: "Date night, just us", date: "2026-10-09", time: "19:00", note: null },
+      { type: "send_note", body: "Thinking of you. Can I take you out Friday night, just us?" },
+    ]);
+    expect(r.followUp).toMatch(/look at your stars to see if it's a timing thing\? Or does this feel like something deeper\?/);
+    expect(r.reply.split(/\s+/).length).toBeLessThan(85); // about 30 seconds out loud, even with the partner's own words in it
+  });
+
+  it("follows up the way Thomas described: the stars, or something deeper", () => {
+    const stars = fallbackReply(request("let's look at the stars, maybe it's a timing thing"));
+    expect(stars.reply).toMatch(/Taurus.*Scorpio/);
+    expect(stars.reply).toMatch(/not a prediction/);
+    const deeper = fallbackReply(request("I think it's something deeper"));
+    expect(deeper.reply).toMatch(/real conversation/);
+    expect(deeper.actions).toEqual([{ type: "open", to: "checkin" }]);
+  });
+
+  it("gives the rest of what the partner shared when asked 'what else?'", () => {
+    const r = fallbackReply(request("What else did Amy share?"));
+    expect(r.reply).toContain("Pull away to think");
+    expect(r.reply).not.toContain("felt distant"); // already said in the first answer
+  });
+
+  it("offers just a note when a date is already on the calendar", () => {
+    const r = fallbackReply(request("What's Amy up to?", { context: baseContext({ plans: [{ title: "Dinner at Blackbird", plannedFor: "2026-10-10", time: "19:00" }] }) }));
+    expect(r.reply).toContain(`You already have "Dinner at Blackbird" on Saturday, Oct 10.`);
+    expect(r.actions).toEqual([{ type: "send_note", body: "Can't wait for dinner at blackbird on Saturday." }]);
+  });
+
+  it("answers 'what can you do?' in a sentence and asks back instead of dumping a menu for anything else", () => {
+    const help = fallbackReply(request("What can you do?"));
+    expect(help.reply).toMatch(/^I can catch you up on what Amy chose to share/);
+    expect(help.reply).not.toContain("•");
+    const unknown = fallbackReply(request("purple monkey dishwasher"));
+    expect(unknown.reply).toBe("Tell me a bit more. Is this about Amy, something to plan for the two of you, or just something on your mind?");
   });
 
   it("picks a day itself when asked 'what should we do?', and books a named day", () => {
@@ -202,7 +248,9 @@ describe("the go-between", () => {
 
   it("says plainly when the partner hasn't shared anything", () => {
     const r = fallbackReply(request("is something off with us? she seems distant", { partnerShares: [], context: baseContext({ checkins: [] }) }));
-    expect(r.reply).toMatch(/hasn't shared anything/);
+    expect(r.reply).toMatch(/Amy hasn't shared anything with their Buddy yet, but from your check-ins: Amy's connection score dipped/);
+    const nothing = fallbackReply(request("What's Amy up to?", { partnerShares: [], context: baseContext({ checkins: [], pulses: [] }) }));
+    expect(nothing.reply).toMatch(/hasn't shared anything with their Buddy yet, and there's no check-in to go on/);
   });
 
   it("shows crisis resources first and proposes nothing", () => {

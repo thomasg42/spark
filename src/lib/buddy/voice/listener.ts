@@ -127,7 +127,10 @@ export function listenOnce(opts: ListenOptions): ListenHandle {
     settled = true;
     stopWatchdog?.();
     try {
-      current?.stop();
+      // A cancelled turn lets go of the mic at once (abort), so the next turn or
+      // Buddy's voice never waits on a recogniser still finishing up.
+      if (discard && current?.abort) current.abort();
+      else current?.stop();
     } catch {
       // already stopped
     }
