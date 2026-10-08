@@ -1,6 +1,7 @@
 "use client";
 /** Buddy's voice settings: talk back, hands-free, which voice, and how lively. */
 import { Button, Card } from "@/components/ui";
+import { isAppleMobile } from "@/lib/buddy/voice/audio-session";
 import type { BuddyVoice } from "./use-buddy-voice";
 
 export const VOICE_SAMPLE = "Hey you! It's your Spark Buddy. I'm so ready to help. What's on your mind?";
@@ -107,6 +108,11 @@ export function VoicePanel({ voice, premium, onClose }: { voice: BuddyVoice; pre
         ▶ Hear Buddy
       </Button>
       {!voice.canSpeak ? <p className="mt-2 text-sm text-muted">This browser can't speak out loud. Buddy's replies still show as text.</p> : null}
+      {isAppleMobile() ? (
+        <p className="mt-2 text-sm text-muted">
+          On iPhone: Buddy can't be heard while the silent switch is on, and listening needs Siri &amp; Dictation turned on (Settings › Siri). If you added Spark to your Home Screen, open it in Safari to talk.
+        </p>
+      ) : null}
     </Card>
   );
 }

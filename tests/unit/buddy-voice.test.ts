@@ -335,6 +335,121 @@ describe("Buddy's speaker", () => {
   });
 });
 
+describe("iPhone speech reliability (Thomas, 2026-10-08: Buddy wasn't talking back on his phone)", () => {
+  /** A scriptable speech engine: utterances wait until the test starts/ends/fails them. */
+  function engine() {
+    const queued: Array<{ text: string; volume: number; fire: (ev: "start" | "end" | "error", data?: unknown) => void }> = [];
+    let cancels = 0;
+    class Utterance {
+      text: string;
+      rate = 1;
+      pitch = 1;
+      volume = 1;
+      lang = "";
+      voice: unknown = null;
+      onstart: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+    const synth = {
+      getVoices: () => [v("Samantha")],
+      speak(u: Utterance) {
+        queued.push({
+          text: u.text,
+          volume: u.volume,
+          fire: (ev, data) => (ev === "start" ? u.onstart?.() : ev === "end" ? u.onend?.() : u.onerror?.(data)),
+        });
+      },
+      cancel() {
+        cancels++;
+      },
+    };
+    return { synth: synth as unknown as SpeechSynthesis, Utterance: Utterance as unknown as typeof SpeechSynthesisUtterance, queued, cancels: () => cancels };
+  }
+
+  it("keeps warming up on each tap until speech has really started, then stops", () => {
+    const e = engine();
+    const speaker = createSpeaker({ synth: e.synth, Utterance: e.Utterance, createAudio: () => fakeAudio().el });
+    speaker.unlock(); // e.g. a touch iOS didn't count: the warm-up is dropped, no events
+    speaker.unlock(); // the real tap must warm up again
+    expect(e.queued.filter((q) => q.volume === 0)).toHaveLength(2);
+    e.queued[1]!.fire("start");
+    speaker.unlock();
+    expect(e.queued.filter((q) => q.volume === 0)).toHaveLength(2); // primed: no more warm-ups
+  });
+
+  it("never cancels when nothing of Buddy's is playing (Safari drops speech queued right after a cancel)", async () => {
+    const e = engine();
+    const speaker = createSpeaker({ synth: e.synth, Utterance: e.Utterance, createAudio: () => fakeAudio().el });
+    speaker.unlock();
+    const p = speaker.speak("Hi there.");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(e.cancels()).toBe(0);
+    const reply = e.queued.find((q) => q.text === "Hi there.")!;
+    reply.fire("start");
+    reply.fire("end");
+    await p;
+  });
+
+  it("reports silence instead of 'talking' forever when speech never starts, and skips the rest", async () => {
+    vi.useFakeTimers();
+    try {
+      const e = engine();
+      const speaker = createSpeaker({ synth: e.synth, Utterance: e.Utterance, createAudio: () => fakeAudio().el });
+      const troubles: unknown[] = [];
+      speaker.onTrouble((t) => troubles.push(t));
+      const p = speaker.speak("This first sentence is long enough to wait on. And here is a second one.");
+      await vi.advanceTimersByTimeAsync(4100);
+      await p;
+      expect(troubles).toEqual(["silent"]);
+      expect(speaker.speaking).toBe(false);
+      expect(e.queued.map((q) => q.text)).toEqual(["This first sentence is long enough to wait on."]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports 'blocked' when the browser refuses speech, and clears it once speech works", async () => {
+    const e = engine();
+    const speaker = createSpeaker({ synth: e.synth, Utterance: e.Utterance, createAudio: () => fakeAudio().el });
+    const troubles: unknown[] = [];
+    speaker.onTrouble((t) => troubles.push(t));
+    const first = speaker.speak("Hello.");
+    await new Promise((r) => setTimeout(r, 0));
+    e.queued.at(-1)!.fire("error", { error: "not-allowed" });
+    await first;
+    const second = speaker.speak("Hello again.");
+    await new Promise((r) => setTimeout(r, 100));
+    e.queued.at(-1)!.fire("start");
+    e.queued.at(-1)!.fire("end");
+    await second;
+    expect(troubles).toEqual(["blocked", null]);
+  });
+
+  it("tells iOS it's playing before speaking and recording before listening", async () => {
+    const session = { type: "auto" };
+    const types: string[] = [];
+    Object.defineProperty(session, "type", { get: () => types.at(-1) ?? "auto", set: (t: string) => types.push(t), configurable: true });
+    vi.stubGlobal("navigator", { ...globalThis.navigator, audioSession: session, userAgent: "iPhone" });
+    try {
+      const e = engine();
+      const speaker = createSpeaker({ synth: e.synth, Utterance: e.Utterance, createAudio: () => fakeAudio().el });
+      const p = speaker.speak("Hey!");
+      await new Promise((r) => setTimeout(r, 0));
+      e.queued.at(-1)!.fire("end");
+      await p;
+      const h = harness();
+      listenOnce({ Recognition: h.Recognition, now: h.now, every: h.every }).cancel();
+      expect(types).toEqual(["playback", "play-and-record"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe("understanding short spoken replies", () => {
   it("only an unambiguous yes counts as yes", () => {
     for (const t of ["Yes", "yeah, add it!", "do it please", "Sounds good", "okay"]) expect(parseConfirm(t)).toBe("yes");

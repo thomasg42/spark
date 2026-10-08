@@ -17,7 +17,7 @@ import { messageOf, type BuddyTurn, type ShareLevel } from "@/lib/backend/types"
 import { useAiConsent } from "@/lib/buddy/ai-consent";
 import { parseConfirm, parseTrustLevel, questionToSpeech } from "@/lib/buddy/voice/spoken-intents";
 import { MicBlockedError, useBuddyVoice, VoiceUnavailableError } from "./use-buddy-voice";
-import { VoicePanel } from "./voice-panel";
+import { VOICE_SAMPLE, VoicePanel } from "./voice-panel";
 import { buildBuddyContext } from "@/lib/buddy/context";
 import { describeAction, NAV_HREF, runAction } from "@/lib/buddy/actions";
 import { cx } from "@/lib/ui/cx";
@@ -400,22 +400,41 @@ export function BuddyScreen() {
         title="Spark Buddy"
         subtitle={`Your private helper. Only you see this chat. ${partnerName}'s Buddy knows only what ${partnerName} chooses to share.`}
         back={{ href: "/us/", label: "Us" }}
-        action={
-          <span className="flex gap-2">
-            <button
-              type="button"
-              aria-expanded={showVoice}
-              onClick={() => setShowVoice((v) => !v)}
-              className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold text-accent-text"
-            >
-              {voice.prefs.speak ? "🔊 Voice" : "🔇 Voice"}
-            </button>
-            <Link href="/us/buddy/sharing/" className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold text-accent-text">
-              Sharing
-            </Link>
-          </span>
-        }
       />
+      {/* Its own row under the title: in the header, two buttons squeezed "Spark Buddy" on a phone. */}
+      <div className="-mt-2 mb-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          aria-expanded={showVoice}
+          onClick={() => setShowVoice((v) => !v)}
+          className="inline-flex min-h-11 items-center rounded-full border border-line bg-surface px-4 text-sm font-semibold text-accent-text"
+        >
+          {voice.prefs.speak ? "🔊 Voice" : "🔇 Voice off"}
+        </button>
+        <Link href="/us/buddy/sharing/" className="inline-flex min-h-11 items-center rounded-full border border-line bg-surface px-4 text-sm font-semibold text-accent-text">
+          🔒 What Buddy may share
+        </Link>
+      </div>
+      {voice.trouble && voice.prefs.speak ? (
+        <Notice className="mb-4" title={voice.trouble === "blocked" ? "Tap to let Buddy talk" : "Can't hear Buddy?"}>
+          <p>
+            {voice.trouble === "blocked"
+              ? "Your phone needs one tap before Buddy can speak."
+              : "Check that your phone isn't on silent (the switch on the side) and the volume is up."}
+          </p>
+          <Button
+            variant="secondary"
+            className="mt-2 min-h-11"
+            onClick={() => {
+              voice.unlock();
+              voice.hush();
+              void voice.say(VOICE_SAMPLE, { force: true });
+            }}
+          >
+            ▶ Hear Buddy
+          </Button>
+        </Notice>
+      ) : null}
 
       {live && ai.consent === null ? (
         <Card className="mb-4 border-accent">

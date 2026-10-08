@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listenOnce, MicBlockedError, recognitionCtor, VoiceUnavailableError, type ListenHandle } from "@/lib/buddy/voice/listener";
 import { DEFAULT_VOICE_PREFS, loadVoicePrefs, saveVoicePrefs, type VoicePrefs } from "@/lib/buddy/voice/prefs";
-import { createSpeaker, type ServerVoice, type Speaker } from "@/lib/buddy/voice/speaker";
+import { createSpeaker, type ServerVoice, type Speaker, type SpeechTrouble } from "@/lib/buddy/voice/speaker";
 import { rankVoices } from "@/lib/buddy/voice/voices";
 
 export interface SayOptions {
@@ -40,6 +40,8 @@ export interface BuddyVoice {
   canSpeak: boolean;
   canListen: boolean;
   speaking: boolean;
+  /** Set when speech was refused or never started (silent switch, no tap yet); null when working. */
+  trouble: SpeechTrouble;
   listening: boolean;
   heard: string;
   countdown: number | null;
@@ -67,6 +69,7 @@ export function useBuddyVoice(userId: string | null | undefined, server: ServerV
   const [prefs, setPrefsState] = useState<VoicePrefs>(DEFAULT_VOICE_PREFS);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [speaking, setSpeaking] = useState(false);
+  const [trouble, setTrouble] = useState<SpeechTrouble>(null);
   const [listening, setListening] = useState(false);
   const [heard, setHeard] = useState("");
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -85,7 +88,12 @@ export function useBuddyVoice(userId: string | null | undefined, server: ServerV
 
   useEffect(() => {
     if (!speaker) return;
-    return speaker.subscribe(setSpeaking);
+    const offSpeaking = speaker.subscribe(setSpeaking);
+    const offTrouble = speaker.onTrouble(setTrouble);
+    return () => {
+      offSpeaking();
+      offTrouble();
+    };
   }, [speaker]);
 
   // getVoices() is often empty until the browser fires 'voiceschanged'.
@@ -128,11 +136,15 @@ export function useBuddyVoice(userId: string | null | undefined, server: ServerV
       if (e.key === "Escape") stopAll();
       else prime();
     };
-    document.addEventListener("pointerdown", prime, { passive: true });
+    // Only events iOS counts as a real tap (touchend, click, keydown): a touch's
+    // START does not count, and priming on it used the prime up for nothing.
+    document.addEventListener("touchend", prime, { passive: true });
+    document.addEventListener("click", prime, { passive: true });
     document.addEventListener("visibilitychange", onVisibility);
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("pointerdown", prime);
+      document.removeEventListener("touchend", prime);
+      document.removeEventListener("click", prime);
       document.removeEventListener("visibilitychange", onVisibility);
       document.removeEventListener("keydown", onKey);
     };
@@ -232,6 +244,7 @@ export function useBuddyVoice(userId: string | null | undefined, server: ServerV
       canSpeak: !!speaker?.available,
       canListen: typeof window !== "undefined" && recognitionCtor() !== null,
       speaking,
+      trouble,
       listening,
       heard,
       countdown,
@@ -243,7 +256,7 @@ export function useBuddyVoice(userId: string | null | undefined, server: ServerV
       finishListening: () => handle.current?.stop(),
       cancelListening: cancelTurn,
     }),
-    [prefs, setPrefs, voices, noLocalVoice, speaker, speaking, listening, heard, countdown, say, hush, listen, cancelTurn],
+    [prefs, setPrefs, voices, noLocalVoice, speaker, speaking, trouble, listening, heard, countdown, say, hush, listen, cancelTurn],
   );
 }
 

@@ -13,6 +13,8 @@
  * Clock, timers and the recogniser are injectable for tests.
  */
 
+import { setAudioSession } from "./audio-session";
+
 export interface Pacing {
   /** Quiet time after speech that ends the turn. */
   silenceHoldMs: number;
@@ -197,6 +199,7 @@ export function listenOnce(opts: ListenOptions): ListenHandle {
     };
 
     try {
+      setAudioSession("play-and-record"); // iPhone: tell Safari we're recording now
       recognition.start();
     } catch {
       finish();

@@ -17,6 +17,7 @@
  * speechSynthesis is warmed in the same tap, and stop() must also release a
  * pending playback because pause() fires no 'ended'.
  */
+import { setAudioSession } from "./audio-session";
 import { chunkForSpeech, toSpeechText } from "./speech-text";
 import { pickLivelyVoice } from "./voices";
 
@@ -43,9 +44,21 @@ export interface SpeakerDeps {
 // 0.1 s of silence: playing it inside the first tap unlocks the shared element on iOS.
 const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
 
+/**
+ * Why Buddy may not be heard: "blocked" = the browser refused speech (no tap
+ * yet); "silent" = speech never started (iPhone silent switch, muted, or a
+ * stuck speech engine). null = speech is working.
+ */
+export type SpeechTrouble = "blocked" | "silent" | null;
+
+/** How long speech may take to start before we say something is wrong. */
+export const START_WATCHDOG_MS = 4000;
+
 export interface Speaker {
   /** Call from inside a tap/keypress so later speech is allowed to play (iOS). */
   unlock(): void;
+  /** Notified when speech is refused or never starts, and again (null) once it works. */
+  onTrouble(listener: (trouble: SpeechTrouble) => void): () => void;
   speak(text: string, opts?: SpeakOptions): Promise<void>;
   stop(): void;
   readonly speaking: boolean;
@@ -68,6 +81,22 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
   let unlocked = false;
   let release: (() => void) | null = null;
   const listeners = new Set<(s: boolean) => void>();
+  const troubleListeners = new Set<(t: SpeechTrouble) => void>();
+  let trouble: SpeechTrouble = null;
+  const report = (t: SpeechTrouble) => {
+    if (trouble === t) return;
+    trouble = t;
+    troubleListeners.forEach((l) => l(t));
+  };
+  // Safari can garbage-collect an utterance that nothing references, and then its
+  // onend never fires: hold every utterance until it settles.
+  const alive = new Set<SpeechSynthesisUtterance>();
+  /** True once speech has actually started on this page (the iOS gesture prime worked). */
+  let primed = false;
+  /** An utterance of OURS is queued or speaking (never cancel a silent warm-up). */
+  let deviceInFlight = 0;
+  let lastCancelAt = -Infinity;
+  const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
   const setSpeaking = (value: boolean) => {
     if (speaking === value) return;
@@ -83,8 +112,6 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
     }
     return audio;
   };
-
-  let warmed = false;
 
   function unlock() {
     // Never swap the shared element's source while a reply is playing.
@@ -107,11 +134,23 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
         // No audio element (tests, old browsers): the device voice still works.
       }
     }
-    if (synth && Utterance && !warmed) {
-      warmed = true;
+    // iOS only lets a page speak after a speak() inside a real tap. Warm up on
+    // every tap until speech has actually started once: a warm-up made outside a
+    // counted gesture is silently dropped, so it must not count as done.
+    if (synth && Utterance && !primed && !speaking) {
       try {
         const warm = new Utterance(" ");
         warm.volume = 0;
+        const settle = () => alive.delete(warm);
+        warm.onstart = () => {
+          primed = true;
+        };
+        warm.onend = () => {
+          primed = true;
+          settle();
+        };
+        warm.onerror = settle;
+        alive.add(warm);
         synth.speak(warm);
       } catch {
         // ignore
@@ -139,6 +178,7 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
       a.onended = finish(resolve);
       a.onerror = finish(() => reject(new Error("playback failed")));
       a.src = url;
+      setAudioSession("playback");
       try {
         const played = a.play();
         if (played && typeof played.catch === "function") played.catch(finish(() => reject(new Error("playback blocked"))));
@@ -148,9 +188,13 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
     });
   }
 
-  function sayWithDevice(text: string, mine: number, opts: SpeakOptions): Promise<void> {
-    return new Promise((resolve) => {
-      if (!synth || !Utterance || mine !== token) return resolve();
+  /** Speaks one chunk with the device voice. Resolves false when speech failed to start. */
+  async function sayWithDevice(text: string, mine: number, opts: SpeakOptions): Promise<boolean> {
+    // Safari drops an utterance queued in the same instant as cancel(): give it a beat.
+    const sinceCancel = now() - lastCancelAt;
+    if (sinceCancel < 80) await new Promise((r) => setTimeout(r, 80 - sinceCancel));
+    return new Promise<boolean>((resolve) => {
+      if (!synth || !Utterance || mine !== token) return resolve(true);
       const u = new Utterance(text);
       const energy = Math.min(1.3, Math.max(0.8, opts.energy ?? 1.1));
       u.rate = energy;
@@ -158,24 +202,53 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
       u.volume = 1;
       const voice = pickLivelyVoice(synth.getVoices(), opts.voiceURI ?? null, opts.onDeviceOnly ?? false);
       // On-device only with no local voice: stay silent rather than use a network voice.
-      if (!voice && opts.onDeviceOnly) return resolve();
+      if (!voice && opts.onDeviceOnly) return resolve(true);
       if (voice) {
         u.voice = voice;
         u.lang = voice.lang;
       } else u.lang = "en-US";
       let done = false;
+      let started = false;
       // Safari drops onend often enough to stall a conversation: never wait longer than the words could take.
-      const ceiling = setTimeout(() => end(), Math.min(20000, 900 + text.length * 90));
-      const end = () => {
+      const ceiling = setTimeout(() => end(true), Math.min(20000, 900 + text.length * 90));
+      // Speech that never starts (silent switch, refused, stuck engine) must not leave Buddy "talking" in silence.
+      const watchdog = setTimeout(() => {
+        if (!started && !done) {
+          report("silent");
+          end(false);
+        }
+      }, START_WATCHDOG_MS);
+      const end = (ok: boolean) => {
         if (done) return;
         done = true;
         clearTimeout(ceiling);
-        if (release === end) release = null;
-        resolve();
+        clearTimeout(watchdog);
+        alive.delete(u);
+        deviceInFlight = Math.max(0, deviceInFlight - 1);
+        if (release === endInterrupted) release = null;
+        resolve(ok);
       };
-      u.onend = end;
-      u.onerror = end; // cancel() fires onerror ("interrupted"): treat as finished
-      release = end;
+      const endInterrupted = () => end(true);
+      u.onstart = () => {
+        started = true;
+        primed = true;
+        report(null);
+      };
+      u.onend = () => end(true);
+      u.onerror = (event: Event) => {
+        // cancel() fires "interrupted"/"canceled": just finished. "not-allowed": no tap yet.
+        const code = (event as Event & { error?: string })?.error;
+        if (code === "not-allowed") {
+          primed = false;
+          report("blocked");
+          return end(false);
+        }
+        end(true);
+      };
+      release = endInterrupted;
+      alive.add(u);
+      deviceInFlight++;
+      setAudioSession("playback"); // after the mic, iOS would otherwise use the quiet earpiece
       synth.speak(u);
     });
   }
@@ -207,7 +280,8 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
           useServer = false;
           pending = null;
         }
-        await sayWithDevice(chunks[i]!, mine, opts);
+        // If speech didn't start, the rest of the reply won't either: stop instead of waiting per chunk.
+        if (!(await sayWithDevice(chunks[i]!, mine, opts))) return;
       }
     } finally {
       if (mine === token) setSpeaking(false);
@@ -222,9 +296,12 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
         // ignore
       }
     }
-    if (synth) {
+    // Only cancel when our own speech is queued or playing: cancelling a silent
+    // warm-up (or nothing) can undo the iOS prime or swallow the next reply.
+    if (synth && deviceInFlight > 0) {
       try {
         synth.cancel();
+        lastCancelAt = now();
       } catch {
         // ignore
       }
@@ -252,6 +329,10 @@ export function createSpeaker(deps: SpeakerDeps = {}): Speaker {
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
+    },
+    onTrouble(listener) {
+      troubleListeners.add(listener);
+      return () => troubleListeners.delete(listener);
     },
     get available() {
       return !!(synth && Utterance);
