@@ -36,6 +36,7 @@ export function freshState(): DemoState {
     datePlans: [],
     dateRules: [],
     lifeChanges: [],
+    distanceFlags: [],
     projects: [],
     money: [],
   };
@@ -144,12 +145,19 @@ export function buildSeed(today: Date): DemoState {
       [DEMO_ALEX]: [
         { questionId: "what_attracted_you", section: "beginnings", value: "How Sam laughed at their own jokes before the punchline.", skipped: false, updatedAt: at(-20) },
         { questionId: "how_we_met_mine", section: "beginnings", value: "Trivia night. I thought Sam was on the wrong team on purpose.", skipped: false, updatedAt: at(-20) },
+        // Answer to unlock (Module H): Alex answered three of the four questions Sam shared on.
+        // trust_hurts is left unanswered so the demo shows a locked hint waiting.
+        { questionId: "love_language", section: "roots", value: ["touch", "time"], skipped: false, updatedAt: at(-5) },
+        { questionId: "conflict_tendency", section: "attachment", value: "pursue", skipped: false, updatedAt: at(-5) },
+        { questionId: "feel_close_when", section: "closeness_trust", value: "Cooking on a Sunday with nowhere to be.", skipped: false, updatedAt: at(-5) },
+        { questionId: "dont_take_personally", section: "attachment", value: "When I go quiet I'm working out what to say, not keeping score.", skipped: false, updatedAt: at(-5) },
       ],
       [DEMO_SAM]: [
         { questionId: "what_attracted_you", section: "beginnings", value: "Alex was kind to the bartender when it got busy.", skipped: false, updatedAt: at(-19) },
         { questionId: "trust_level", section: "closeness_trust", value: 4, skipped: false, updatedAt: at(-19) },
         { questionId: "love_language", section: "roots", value: ["time", "words"], skipped: false, updatedAt: at(-6) },
         { questionId: "conflict_tendency", section: "attachment", value: "pull_away", skipped: false, updatedAt: at(-6) },
+        { questionId: "dont_take_personally", section: "attachment", value: "It usually means I'm overwhelmed and sorting my thoughts. It doesn't mean I'm done with us.", skipped: false, updatedAt: at(-6) },
         { questionId: "feel_close_when", section: "closeness_trust", value: "When Alex puts the phone away and we just talk, no plans, no rush.", skipped: false, updatedAt: at(-6) },
         { questionId: "trust_hurts", section: "closeness_trust", value: "When plans with me get cancelled for work again and again, I start to feel like an afterthought.", skipped: false, updatedAt: at(-6) },
         { questionId: "leave_behind", section: "roots", value: "Private sample answer that Sam kept off the table.", skipped: false, updatedAt: at(-6) },
@@ -209,6 +217,7 @@ export function buildSeed(today: Date): DemoState {
       [DEMO_SAM]: [
         { questionId: "love_language", level: "open", text: "Kind words and hearing it out loud; Quality time, just us", updatedAt: at(-6) },
         { questionId: "conflict_tendency", level: "open", text: "Pull away to think", updatedAt: at(-6) },
+        { questionId: "dont_take_personally", level: "open", text: "It usually means I'm overwhelmed and sorting my thoughts. It doesn't mean I'm done with us.", updatedAt: at(-6) },
         { questionId: "feel_close_when", level: "hint", text: "Unhurried evenings with phones put away go a long way with them.", updatedAt: at(-6) },
         { questionId: "trust_hurts", level: "hint", text: "Plans that keep getting moved can make them feel like an afterthought. Protecting time together matters.", updatedAt: at(-6) },
       ],
@@ -218,6 +227,7 @@ export function buildSeed(today: Date): DemoState {
     datePlans: [],
     dateRules: [],
     lifeChanges: [],
+    distanceFlags: [],
     projects: [
       { id: "seed-project-1", title: "Paint the baby's room (pick the right color first)", kind: "family", status: "active", rank: 1, targetDate: day(30), budgetCents: 25000, note: "Order three sample pots and test them on the wall in daylight.", createdBy: DEMO_SAM, createdAt: at(-14), updatedAt: at(-2) },
       { id: "seed-project-2", title: "Finish the garage", kind: "home", status: "active", rank: 2, targetDate: day(60), budgetCents: 120000, note: null, createdBy: DEMO_ALEX, createdAt: at(-13), updatedAt: at(-13) },

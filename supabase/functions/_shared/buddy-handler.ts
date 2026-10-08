@@ -37,6 +37,7 @@ import {
   crisisReply,
   fallbackHint,
   fallbackReply,
+  isHintMoment,
   isShareLevel,
   MAX_SPEAK_CHARS_PER_DAY,
   MAX_USER_MESSAGES_PER_DAY,
@@ -49,7 +50,9 @@ import {
   type BuddyReply,
   type BuddyShare,
   type BuddyTurn,
+  type HintMoment,
   type PartnerShare,
+  type ShareTeaser,
   type SharedLevel,
 } from "./buddy.ts";
 import { mentionsCrisis } from "./crisis.ts";
@@ -65,6 +68,7 @@ export interface ShareRow {
   level: SharedLevel;
   shared_ciphertext: string;
   updated_at: string;
+  show_when?: HintMoment | null;
 }
 
 export interface MessageRow {
@@ -79,7 +83,11 @@ export interface BuddyRepo {
   couple(): Promise<{ coupleId: string; partnerId: string | null } | null>;
   /** Share rows of one member (RLS: own rows, or the partner's hint/open rows). */
   shares(ownerId: string): Promise<ShareRow[]>;
-  upsertShare(row: { coupleId: string; questionId: string; level: SharedLevel; ciphertext: string }): Promise<ShareRow>;
+  upsertShare(row: { coupleId: string; questionId: string; level: SharedLevel; ciphertext: string; showWhen: HintMoment | null }): Promise<ShareRow>;
+  /** Question ids the caller has answered (skips don't count): the answer-to-unlock second guard. */
+  answeredQuestionIds(): Promise<string[]>;
+  /** What the partner shared that the caller hasn't unlocked yet (ids and levels only). */
+  teasers(): Promise<ShareTeaser[]>;
   deleteShare(questionId: string): Promise<void>;
   /** The caller's own stored answer for one question, or null when unanswered. */
   ownAnswer(questionId: string): Promise<{ ciphertext: string | null; skipped: boolean } | null>;
@@ -92,7 +100,7 @@ export interface BuddyRepo {
   chargeVoice(chars: number): Promise<number>;
 }
 
-const SHARE_COLUMNS = "user_id, question_id, level, shared_ciphertext, updated_at";
+const SHARE_COLUMNS = "user_id, question_id, level, shared_ciphertext, updated_at, show_when";
 
 export function createSupabaseBuddyRepo(supabase: SupabaseClient, userId: string): BuddyRepo {
   return {
@@ -114,13 +122,23 @@ export function createSupabaseBuddyRepo(supabase: SupabaseClient, userId: string
       const { data, error } = await supabase
         .from("buddy_shares")
         .upsert(
-          { user_id: userId, couple_id: row.coupleId, question_id: row.questionId, level: row.level, shared_ciphertext: row.ciphertext },
+          { user_id: userId, couple_id: row.coupleId, question_id: row.questionId, level: row.level, shared_ciphertext: row.ciphertext, show_when: row.showWhen },
           { onConflict: "user_id,question_id" },
         )
         .select(SHARE_COLUMNS)
         .single();
       if (error) dbError(error, "Could not save that share.");
       return data as ShareRow;
+    },
+    async answeredQuestionIds() {
+      const { data, error } = await supabase.from("private_answers").select("question_id").eq("user_id", userId).eq("skipped", false).limit(500);
+      if (error) dbError(error, "Could not load your answers.");
+      return ((data ?? []) as Array<{ question_id: string }>).map((r) => r.question_id);
+    },
+    async teasers() {
+      const { data, error } = await supabase.rpc("partner_share_teasers");
+      if (error) dbError(error, "Could not load what's waiting for you.");
+      return ((data ?? []) as Array<{ question_id: string; level: SharedLevel }>).map((r) => ({ questionId: r.question_id, level: r.level }));
     },
     async deleteShare(questionId) {
       const { error } = await supabase.from("buddy_shares").delete().eq("user_id", userId).eq("question_id", questionId);
@@ -240,14 +258,17 @@ export function createBuddyHandler(deps: BuddyDeps): Handler {
     }
 
     async function openShares(ownerId: string): Promise<PartnerShare[]> {
-      const rows = await deps.repo.shares(ownerId);
+      const [rows, answered] = await Promise.all([deps.repo.shares(ownerId), deps.repo.answeredQuestionIds()]);
+      const unlocked = new Set(answered);
       const out: PartnerShare[] = [];
       for (const row of rows) {
-        // Second guard behind RLS: only hint/open rows of the requested owner, ever.
+        // Second guard behind RLS: only hint/open rows of the requested owner, ever,
+        // and only on questions the caller has answered too (answer to unlock).
         if (row.user_id !== ownerId || (row.level !== "hint" && row.level !== "open")) continue;
+        if (!unlocked.has(row.question_id)) continue;
         try {
           const text = await sealer!.decrypt(row.shared_ciphertext, scopes.couple(couple!.coupleId), aad.buddyShare(ownerId, row.question_id));
-          out.push({ questionId: row.question_id, level: row.level, text });
+          out.push({ questionId: row.question_id, level: row.level, text, showWhen: row.show_when ?? null });
         } catch {
           console.error("buddy: share decrypt failed");
         }
@@ -327,7 +348,7 @@ export function createBuddyHandler(deps: BuddyDeps): Handler {
           if (row.user_id !== userId) continue;
           try {
             const text = await sealer.decrypt(row.shared_ciphertext, scopes.couple(couple.coupleId), aad.buddyShare(userId, row.question_id));
-            shares.push({ questionId: row.question_id, level: row.level, text, updatedAt: row.updated_at });
+            shares.push({ questionId: row.question_id, level: row.level, text, updatedAt: row.updated_at, showWhen: row.show_when ?? null });
           } catch {
             console.error("buddy: own share decrypt failed");
           }
@@ -350,9 +371,18 @@ export function createBuddyHandler(deps: BuddyDeps): Handler {
         } catch (error) {
           throw new HttpError(400, error instanceof Error ? error.message : "That hint doesn't look right.");
         }
+        // A moment-only setting is for hints; open shares are always open.
+        if (body.showWhen !== undefined && body.showWhen !== null && !isHintMoment(body.showWhen)) throw new HttpError(400, "Pick when this hint should show.");
+        const showWhen = body.level === "hint" && isHintMoment(body.showWhen) ? body.showWhen : null;
         const ciphertext = await sealer.encrypt(text, scopes.couple(couple.coupleId), aad.buddyShare(userId, question.id));
-        const row = await deps.repo.upsertShare({ coupleId: couple.coupleId, questionId: question.id, level: body.level, ciphertext });
-        return { share: { questionId: question.id, level: body.level, text, updatedAt: row.updated_at } satisfies BuddyShare };
+        const row = await deps.repo.upsertShare({ coupleId: couple.coupleId, questionId: question.id, level: body.level, ciphertext, showWhen });
+        return { share: { questionId: question.id, level: body.level, text, updatedAt: row.updated_at, showWhen } satisfies BuddyShare };
+      }
+
+      case "partner_hints": {
+        // What your partner let you see (unlocked, and moment-only hints only in their moment), plus what's waiting.
+        const [shares, teasers] = await Promise.all([couple.partnerId ? openShares(couple.partnerId) : Promise.resolve([]), couple.partnerId ? deps.repo.teasers() : Promise.resolve([])]);
+        return { shares, teasers };
       }
 
       case "unshare": {

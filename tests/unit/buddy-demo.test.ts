@@ -31,11 +31,17 @@ describe("Spark Buddy in the demo", () => {
     expect(reply.reply).toContain(`felt distant "when our plans kept getting moved for work"`);
     expect(reply.actions.map((a) => a.type)).toEqual(["plan_date", "send_note"]);
     expect(reply.reply).not.toContain("Private sample answer");
-    // The rest of Sam's shares, on request: the approved hint only, never the raw answer.
+    // The rest of Sam's shares, on request: only on questions Alex answered too (Module H, answer to unlock).
     const more = (await backend.buddy.send({ text: "What else did Sam share?", interviewQuestionId: null, context, aiConsent: false })).reply.reply;
     expect(more).toContain("Pull away to think");
-    expect(more).toContain("Plans that keep getting moved");
-    expect(more).not.toContain("I start to feel like an afterthought");
+    expect(more).not.toContain("Plans that keep getting moved"); // trust_hurts: Alex hasn't answered it yet
+    expect((await backend.buddy.partnerHints()).teasers).toEqual([{ questionId: "trust_hurts", level: "hint" }]);
+    // Alex answers the same question: Sam's approved hint unlocks, never Sam's raw words.
+    await backend.answers.save("trust_hurts", "Plans that change last minute.");
+    const unlocked = await backend.buddy.partnerHints();
+    expect(unlocked.teasers).toEqual([]);
+    expect(unlocked.shares.find((x) => x.questionId === "trust_hurts")?.text).toMatch(/^Plans that keep getting moved/);
+    expect(JSON.stringify(unlocked)).not.toContain("I start to feel like an afterthought");
     expect(reply.reply).not.toContain("I start to feel like an afterthought"); // Sam's raw trust_hurts answer stays private; only the approved hint is used
     expect(JSON.stringify(context)).not.toContain("Private sample");
     expect(reply.reply.length).toBeLessThan(1500); // nothing cut off

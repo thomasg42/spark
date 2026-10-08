@@ -41,7 +41,7 @@ class World {
       upsertShare: async (row) => {
         const updated_at = new Date(Date.UTC(2026, 9, 6, 12, 0, this.clock++)).toISOString();
         this.shares = this.shares.filter((r) => !(r.user_id === userId && r.question_id === row.questionId));
-        const stored: ShareRow = { user_id: userId, question_id: row.questionId, level: row.level, shared_ciphertext: row.ciphertext, updated_at };
+        const stored: ShareRow = { user_id: userId, question_id: row.questionId, level: row.level, shared_ciphertext: row.ciphertext, updated_at, show_when: row.showWhen };
         this.shares.push(stored);
         return stored;
       },
@@ -49,6 +49,12 @@ class World {
         this.shares = this.shares.filter((r) => !(r.user_id === userId && r.question_id === questionId));
       },
       ownAnswer: async (questionId) => this.answers.get(`${userId}|${questionId}`) ?? null,
+      // Deliberately NOT applied in shares() above: the handler's own answer-to-unlock guard must hold by itself.
+      answeredQuestionIds: async () => [...this.answers.entries()].filter(([k, v]) => k.startsWith(`${userId}|`) && !v.skipped).map(([k]) => k.split("|")[1]!),
+      teasers: async () =>
+        this.shares
+          .filter((r) => r.user_id === partner && !this.answers.get(`${userId}|${r.question_id}`)?.ciphertext)
+          .map((r) => ({ questionId: r.question_id, level: r.level })),
       messages: async (limit) => this.messages.filter((m) => m.user_id === userId).slice(-limit),
       insertMessages: async (rows) => {
         for (const r of rows) this.messages.push({ id: r.id, user_id: userId, role: r.role, body_ciphertext: r.ciphertext, created_at: new Date(Date.UTC(2026, 9, 6, 12, 0, this.clock++)).toISOString() });
@@ -135,6 +141,31 @@ describe("talking to Buddy", () => {
     const samBuddy = handlerFor(sam);
     await samBuddy({ action: "share", questionId: "love_language", level: "open" });
     await samBuddy({ action: "share", questionId: "trust_hurts", level: "hint", hint: "Protecting time together matters to them." });
+    // Answer to unlock (Module H): Alex has answered the same two questions.
+    await world.seedAnswer(alex, "love_language", ["touch"]);
+    await world.seedAnswer(alex, "trust_hurts", "Last-minute cancellations.");
+  });
+
+  // Thomas, 2026-10-08: "if they don't answer they get no hints." The handler holds this even if RLS were loosened.
+  it("keeps a share locked until the reader answers the same question, and says what's waiting", async () => {
+    world.answers.delete(`${alex}|trust_hurts`);
+    const claude = fakeClaude();
+    await handlerFor(alex, claude.generate)({ action: "send", text: "Is Sam upset with me?", context, aiConsent: true });
+    expect(claude.prompts[0]!.user).not.toContain("Protecting time together matters to them.");
+    expect(claude.prompts[0]!.user).toContain("Quality time, just us");
+    const hints = (await handlerFor(alex)({ action: "partner_hints" })) as { shares: Array<{ questionId: string; text: string }>; teasers: Array<{ questionId: string; level: string }> };
+    expect(hints.shares.map((x) => x.questionId)).toEqual(["love_language"]);
+    expect(hints.teasers).toEqual([{ questionId: "trust_hurts", level: "hint" }]);
+    expect(JSON.stringify(hints.teasers)).not.toContain("Protecting");
+  });
+
+  it("stores a moment-only setting for hints only, and refuses an unknown moment", async () => {
+    const samBuddy = handlerFor(sam);
+    const hint = (await samBuddy({ action: "share", questionId: "trust_hurts", level: "hint", hint: "Protecting time together matters to them.", showWhen: "away" })) as { share: { showWhen: string | null } };
+    expect(hint.share.showWhen).toBe("away");
+    const open = (await samBuddy({ action: "share", questionId: "love_language", level: "open", showWhen: "away" })) as { share: { showWhen: string | null } };
+    expect(open.share.showWhen).toBeNull();
+    await expect(samBuddy({ action: "share", questionId: "trust_hurts", level: "hint", hint: "x y z", showWhen: "whenever" })).rejects.toThrow(/when this hint should show/);
   });
 
   it("gives Claude the partner's shares and never an off-the-table answer, only with consent", async () => {

@@ -13,10 +13,10 @@ import type { ISODate } from "@/lib/domain/dates";
 import type { SocialLevel } from "@/lib/domain/social";
 import type { AnswerValue } from "@shared/questionnaires.ts";
 import type { CheckinAnswers, CheckinSummary } from "@shared/checkin-questions.ts";
-import type { BuddyClientContext, BuddyReply, BuddyShare, BuddyTurn, ShareLevel } from "@shared/buddy.ts";
+import type { BuddyClientContext, BuddyReply, BuddyShare, BuddyTurn, HintMoment, PartnerShare, ShareLevel, ShareTeaser } from "@shared/buddy.ts";
 
 export type { Cadence, PickableCadence, ActivityCategory, StoryKind, ISODate, SocialLevel, AnswerValue, CheckinAnswers, CheckinSummary };
-export type { BuddyClientContext, BuddyReply, BuddyShare, BuddyTurn, ShareLevel };
+export type { BuddyClientContext, BuddyReply, BuddyShare, BuddyTurn, HintMoment, PartnerShare, ShareLevel, ShareTeaser };
 
 export type AccentTheme = "rose" | "plum" | "ocean" | "sunset" | "forest";
 export type ColorMode = "system" | "light" | "dark";
@@ -224,7 +224,13 @@ export interface DateRuleInput {
   note?: string | null;
 }
 
-export type LifeChangeKind = "new_job" | "new_schedule" | "move" | "other";
+/** trip / work_stretch are time apart: they let "when we're apart" hints show and don't change the rhythm. */
+export type LifeChangeKind = "new_job" | "new_schedule" | "move" | "other" | "trip" | "work_stretch";
+
+export interface DistanceFlag {
+  userId: string;
+  raisedAt: string;
+}
 
 /** A big life change (Module E). Shared by the couple; it raises the check-in rhythm for six weeks. */
 export interface LifeChangeEntry {
@@ -436,8 +442,14 @@ export interface Backend {
     send(input: BuddySendInput): Promise<BuddySendResult>;
     /** The signed-in person's own shares (what their partner's Buddy may see). */
     shares(): Promise<BuddyShare[]>;
-    /** "private" removes the share; "hint" needs the approved hint text. */
-    share(questionId: string, level: ShareLevel, hint?: string | null): Promise<BuddyShare | null>;
+    /** "private" removes the share; "hint" needs the approved hint text, and may wait for a moment (showWhen). */
+    share(questionId: string, level: ShareLevel, hint?: string | null, showWhen?: HintMoment | null): Promise<BuddyShare | null>;
+    /**
+     * Module H: what your partner let you see (only on questions you've answered too,
+     * and moment-only hints only while their moment is happening), and what's waiting
+     * for you to answer (ids and levels only).
+     */
+    partnerHints(): Promise<{ shares: PartnerShare[]; teasers: ShareTeaser[] }>;
     /** With aiConsent, Claude drafts the hint; otherwise Spark's built-in wording. */
     draftHint(questionId: string, aiConsent?: boolean): Promise<{ hint: string; source: "claude" | "fallback" }>;
     clear(): Promise<void>;
@@ -462,6 +474,17 @@ export interface Backend {
     add(input: DateRuleInput): Promise<DateRule>;
     update(id: string, patch: Partial<DateRuleInput> & { active?: boolean }): Promise<DateRule>;
     remove(id: string): Promise<void>;
+  };
+
+  /**
+   * "I'm feeling a bit distant" (Module H): raised on purpose, seen by both, lasts 14 days,
+   * and lets the hints its owner set for that moment show.
+   */
+  distanceFlags: {
+    /** Both partners' raised flags (at most one each), still within 14 days. */
+    list(): Promise<DistanceFlag[]>;
+    raise(): Promise<void>;
+    clear(): Promise<void>;
   };
 
   /** Big life changes, newest first. Both see them; only the person who logged one can remove it. */

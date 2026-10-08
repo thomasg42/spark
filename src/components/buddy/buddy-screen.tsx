@@ -13,7 +13,8 @@ import { CrisisResources } from "@/components/crisis-resources";
 import { QuestionField } from "@/components/questions/question-field";
 import type { Draft } from "@/components/questions/flow";
 import { Badge, Button, Card, Notice, PageHeader, ProgressBar, Spinner, TextAreaField, useToast } from "@/components/ui";
-import { messageOf, type BuddyTurn, type ShareLevel } from "@/lib/backend/types";
+import { messageOf, type BuddyTurn, type HintMoment, type ShareLevel } from "@/lib/backend/types";
+import { MomentPicker } from "@/components/hints/moment-picker";
 import { useAiConsent } from "@/lib/buddy/ai-consent";
 import { parseConfirm, parseTrustLevel, questionToSpeech } from "@/lib/buddy/voice/spoken-intents";
 import { MicBlockedError, useBuddyVoice, VoiceUnavailableError } from "./use-buddy-voice";
@@ -767,6 +768,7 @@ function TrustCard({
 }: { question: Question; partnerName: string; aiOn: boolean; hintRequest: number; onDone(level: ShareLevel): void }) {
   const { backend } = useApp();
   const [hint, setHint] = useState<string | null>(null);
+  const [showWhen, setShowWhen] = useState<HintMoment | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const firstRequest = useRef(hintRequest);
@@ -793,7 +795,7 @@ function TrustCard({
     }
     setBusy(true);
     try {
-      await backend.buddy.share(question.id, level, level === "hint" ? hint : null);
+      await backend.buddy.share(question.id, level, level === "hint" ? hint : null, level === "hint" ? showWhen : null);
       onDone(level);
     } catch (e) {
       setError(messageOf(e));
@@ -806,7 +808,7 @@ function TrustCard({
     <Card className="mt-4">
       <p className="text-sm font-semibold text-muted">Saved privately ✓</p>
       <p className="mt-1 text-lg font-bold text-ink">Do you trust this to your Spark Buddy?</p>
-      <p className="mt-1 text-sm text-muted">Should {partnerName}'s Buddy know anything about “{question.prompt}”?</p>
+      <p className="mt-1 text-sm text-muted">Should {partnerName}'s Buddy know anything about “{question.prompt}”? {partnerName} sees it only after answering this same question too.</p>
       <div className="mt-3 grid gap-2">
         {SHARE_LEVELS.map((level) => (
           <button
@@ -827,6 +829,7 @@ function TrustCard({
       {hint !== null ? (
         <div className="mt-4">
           <TextAreaField label="The hint (edit it until it feels right)" value={hint} onChange={setHint} rows={3} maxLength={280} />
+          <MomentPicker value={showWhen} onChange={setShowWhen} />
           <Button loading={busy} onClick={() => void choose("hint")}>
             Approve this hint
           </Button>

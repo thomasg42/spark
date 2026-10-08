@@ -1,6 +1,6 @@
 import { isShareLevel, MESSAGE_MAX, SPEAK_CHUNK_MAX } from "@shared/buddy.ts";
 import { findQuestion } from "@shared/questionnaires.ts";
-import { UserFacingError, type Backend, type BuddySendResult, type BuddyShare, type BuddyTurn, type StudioVoiceResult } from "../types";
+import { UserFacingError, type Backend, type BuddySendResult, type BuddyShare, type BuddyTurn, type PartnerShare, type ShareTeaser, type StudioVoiceResult } from "../types";
 import { invoke, requireUserId } from "./client";
 
 /**
@@ -32,12 +32,17 @@ export const buddy: Backend["buddy"] = {
     const { shares } = await invoke<{ shares: BuddyShare[] }>("buddy", { action: "shares" });
     return shares ?? [];
   },
-  async share(questionId, level, hint) {
+  async share(questionId, level, hint, showWhen = null) {
     await requireUserId();
     knownQuestion(questionId);
     if (!isShareLevel(level)) throw new UserFacingError("Pick off the table, hint, or open.");
-    const { share } = await invoke<{ share: BuddyShare | null }>("buddy", { action: "share", questionId, level, hint: hint ?? null });
+    const { share } = await invoke<{ share: BuddyShare | null }>("buddy", { action: "share", questionId, level, hint: hint ?? null, showWhen: level === "hint" ? showWhen : null });
     return share;
+  },
+  async partnerHints() {
+    await requireUserId();
+    const { shares, teasers } = await invoke<{ shares: PartnerShare[]; teasers: ShareTeaser[] }>("buddy", { action: "partner_hints" });
+    return { shares: shares ?? [], teasers: teasers ?? [] };
   },
   async draftHint(questionId, aiConsent = false) {
     await requireUserId();

@@ -29,14 +29,14 @@ export function LifeChangeCard({ onChange }: { onChange?: () => void }) {
     setOpen(false);
     setKind(null);
     setNote("");
-    toast.show("Logged. Check-ins will come a little more often for six weeks.");
+    toast.show(`Logged. ${LIFE_CHANGE_COPY[kind].effect}`);
     return true;
   });
 
   return (
     <Card className="mt-5" aria-labelledby="life-change-title">
       <h2 id="life-change-title" className="text-xl font-bold text-ink">Big life change?</h2>
-      <p className="mt-1 text-sm text-muted">A new job, a new schedule or a move? Log it and your quick check-ins come a little more often for six weeks, so nothing slips while life is busy. You both see this.</p>
+      <p className="mt-1 text-sm text-muted">A new job, a new schedule or a move? Log it and your quick check-ins come a little more often for six weeks, so nothing slips while life is busy. A trip apart or a long work stretch lets any hints set for times apart show. You both see this.</p>
 
       {list.data?.length ? (
         <ul className="mt-3 divide-y divide-line">
@@ -75,7 +75,7 @@ export function LifeChangeCard({ onChange }: { onChange?: () => void }) {
 
       {open ? (
         <div className="mt-4">
-          <ChoiceGroup legend="What changed?" options={LIFE_CHANGE_KINDS.map((k) => ({ value: k, label: `${LIFE_CHANGE_COPY[k].emoji}  ${LIFE_CHANGE_COPY[k].label}` }))} value={kind} onChange={setKind} columns={2} name="life-change-kind" />
+          <ChoiceGroup legend="What changed?" options={LIFE_CHANGE_KINDS.map((k) => ({ value: k, label: `${LIFE_CHANGE_COPY[k].emoji}  ${LIFE_CHANGE_COPY[k].label}`, description: LIFE_CHANGE_COPY[k].effect }))} value={kind} onChange={setKind} columns={2} name="life-change-kind" />
           <TextField label="When" type="date" value={day} onChange={setDay} />
           <TextAreaField label="Anything to add?" optional value={note} onChange={setNote} rows={2} maxLength={LIFE_CHANGE_NOTE_MAX} placeholder="New shifts start at 6 AM" />
           {add.error ? <Notice tone="danger" className="mb-3" title={add.error} /> : null}

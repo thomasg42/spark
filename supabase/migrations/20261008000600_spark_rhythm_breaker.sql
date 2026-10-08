@@ -31,7 +31,7 @@ create trigger date_rules_touch before update on public.date_rules
 
 -- A couple keeps a handful of standing dates, not a schedule.
 create or replace function public.date_rules_limit()
-returns trigger language plpgsql security definer set search_path = public as $$
+returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   if (select count(*) from public.date_rules where couple_id = new.couple_id) >= 5 then
     raise exception 'You already have 5 standing dates. Remove one first.';  -- P0001: the app shows this message as is
@@ -55,7 +55,8 @@ $$;
 create trigger date_rules_freeze before update on public.date_rules
   for each row execute function public.date_rules_freeze();
 
-create type public.life_change_kind as enum ('new_job', 'new_schedule', 'move', 'other');
+-- trip / work_stretch mean time apart: they unlock "when we're apart" hints (Module H) and do not change the rhythm.
+create type public.life_change_kind as enum ('new_job', 'new_schedule', 'move', 'other', 'trip', 'work_stretch');
 
 create table public.life_changes (
   id           uuid primary key default gen_random_uuid(),

@@ -9,11 +9,12 @@ import { useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { Badge, Button, Card, EmptyState, LoadingBlock, Notice, PageHeader, TextAreaField, useToast } from "@/components/ui";
 import { ButtonLink } from "@/components/ui";
-import { messageOf, type BuddyShare, type SavedAnswer, type ShareLevel } from "@/lib/backend/types";
+import { messageOf, type BuddyShare, type HintMoment, type SavedAnswer, type ShareLevel } from "@/lib/backend/types";
+import { MomentPicker } from "@/components/hints/moment-picker";
 import { useLoad } from "@/lib/ui/hooks";
 import { readAiConsent } from "@/lib/buddy/ai-consent";
 import { cx } from "@/lib/ui/cx";
-import { answerToText, SHARE_COPY, SHARE_LEVELS } from "@shared/buddy.ts";
+import { answerToText, HINT_MOMENT_COPY, SHARE_COPY, SHARE_LEVELS, UNLOCK_NOTE } from "@shared/buddy.ts";
 import { findQuestion, SECTIONS } from "@shared/questionnaires.ts";
 
 export function SharingScreen() {
@@ -44,6 +45,7 @@ export function SharingScreen() {
             </li>
           ))}
         </ul>
+        <p className="mt-3 text-sm font-semibold text-ink">{UNLOCK_NOTE.replace("Your partner", partnerName)} No answer, no hints.</p>
         <p className="mt-3 text-sm text-ink">If {partnerName} turns on AI for their Buddy, the items you share here are sent to Claude so it can help {partnerName}. Off-the-table answers never are.</p>
         {data.data ? (
           <p className="mt-3 text-sm font-semibold text-ink">
@@ -92,6 +94,7 @@ function ShareRow({ answer, share, onChanged }: { answer: SavedAnswer; share: Bu
   const toast = useToast();
   const question = findQuestion(answer.questionId)?.question;
   const [hint, setHint] = useState<string | null>(share?.level === "hint" ? share.text : null);
+  const [showWhen, setShowWhen] = useState<HintMoment | null>(share?.showWhen ?? null);
   const [editingHint, setEditingHint] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +107,7 @@ function ShareRow({ answer, share, onChanged }: { answer: SavedAnswer; share: Bu
     setBusy(true);
     setError(null);
     try {
-      const saved = await backend.buddy.share(question!.id, next, hintText ?? null);
+      const saved = await backend.buddy.share(question!.id, next, hintText ?? null, next === "hint" ? showWhen : null);
       onChanged(saved);
       setEditingHint(false);
       toast.show(next === "private" ? "Off the table." : next === "hint" ? "Hint approved." : "Shared openly.");
@@ -139,6 +142,7 @@ function ShareRow({ answer, share, onChanged }: { answer: SavedAnswer; share: Bu
       {share ? (
         <p className="mt-2 rounded-2xl bg-surface-2 px-3 py-2 text-sm text-ink">
           <span className="font-semibold">Their Buddy may see:</span> “{share.text}”
+          {share.showWhen ? <span className="mt-1 block text-muted">{HINT_MOMENT_COPY[share.showWhen].label}</span> : null}
         </p>
       ) : null}
       {stale ? (
@@ -165,6 +169,7 @@ function ShareRow({ answer, share, onChanged }: { answer: SavedAnswer; share: Bu
       {editingHint && hint !== null ? (
         <div className="mt-3">
           <TextAreaField label="Your hint (only these words are shared)" value={hint} onChange={setHint} rows={3} maxLength={280} />
+          <MomentPicker value={showWhen} onChange={setShowWhen} />
           <div className="flex gap-2">
             <Button loading={busy} onClick={() => void apply("hint", hint)}>
               Approve hint

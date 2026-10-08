@@ -19,6 +19,7 @@ import {
   type DateIdea,
   type DatePlan,
   type DateRule,
+  type DistanceFlag,
   type LifeChangeEntry,
   type Moment,
   type MoneyGoal,
@@ -61,6 +62,8 @@ export interface DemoState {
   dateRules: DateRule[];
   /** Big life changes (Module E). */
   lifeChanges: LifeChangeEntry[];
+  /** "I'm feeling a bit distant" flags (Module H). */
+  distanceFlags: DistanceFlag[];
   projects: Project[];
   money: MoneyGoal[];
 }
@@ -79,6 +82,7 @@ function load(): DemoState {
         // Added 2026-10-08 (Module E): older saved demos simply start with none.
         parsed.dateRules ??= [];
         parsed.lifeChanges ??= [];
+        parsed.distanceFlags ??= [];
         state = parsed;
         return state;
       }

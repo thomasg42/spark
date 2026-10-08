@@ -65,6 +65,25 @@ export function isShareLevel(value: unknown): value is ShareLevel {
   return typeof value === "string" && (SHARE_LEVELS as readonly string[]).includes(value);
 }
 
+/**
+ * Module H: a hint can wait for the moment it helps most. Enforced by the
+ * database (hint_trigger_active); null means "always".
+ */
+export const HINT_MOMENTS = ["away", "excitement_drop", "feeling_distant"] as const;
+export type HintMoment = (typeof HINT_MOMENTS)[number];
+export const HINT_MOMENT_COPY: Record<HintMoment, { label: string; showing: string }> = {
+  away: { label: "Only when we're apart (a trip or a long work stretch)", showing: "Showing because one of you is away or working long hours" },
+  excitement_drop: { label: "Only when excitement dips in our quick check-ins", showing: "Showing because excitement has dipped lately" },
+  feeling_distant: { label: "Only when I say I'm feeling a bit distant", showing: "Showing because they said they're feeling a bit distant" },
+};
+
+export function isHintMoment(value: unknown): value is HintMoment {
+  return typeof value === "string" && (HINT_MOMENTS as readonly string[]).includes(value);
+}
+
+/** Said when someone shares: their partner unlocks it by answering the same question (Thomas: "just keep on answering"). */
+export const UNLOCK_NOTE = "Your partner sees it only after answering this same question themselves.";
+
 /** Your own share, as you see it on the sharing screen. "private" items have no share at all. */
 export interface BuddyShare {
   questionId: string;
@@ -72,6 +91,8 @@ export interface BuddyShare {
   /** Exactly what your partner's Buddy may see: the approved hint, or the answer snapshot. */
   text: string;
   updatedAt: string;
+  /** A hint that waits for a moment (null = always). */
+  showWhen?: HintMoment | null;
 }
 
 /** What your partner chose to let their Buddy pass on. The only partner data a Buddy ever gets. */
@@ -79,6 +100,14 @@ export interface PartnerShare {
   questionId: string;
   level: SharedLevel;
   text: string;
+  /** Set when this is a moment-only hint showing because its moment is happening. */
+  showWhen?: HintMoment | null;
+}
+
+/** Something your partner shared that unlocks once you answer the same question. Never its text. */
+export interface ShareTeaser {
+  questionId: string;
+  level: SharedLevel;
 }
 
 /** Plain-language form of an answer (option labels, not codes). */

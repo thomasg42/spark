@@ -1,4 +1,5 @@
-import { fallbackHint, fallbackReply, isShareLevel, MESSAGE_MAX, sanitizeClientContext, sharedTextFor, type BuddyShare, type BuddyTurn, type PartnerShare } from "@shared/buddy.ts";
+import { fallbackHint, fallbackReply, isHintMoment, isShareLevel, MESSAGE_MAX, sanitizeClientContext, sharedTextFor, type BuddyShare, type BuddyTurn, type PartnerShare, type ShareTeaser } from "@shared/buddy.ts";
+import { hintMomentActive } from "@/lib/domain/hint-moments";
 import { findQuestion } from "@shared/questionnaires.ts";
 import { UserFacingError, type Backend } from "../types";
 import { demoStore, me, myCouple, nowIso, partnerOf, tick } from "./store";
@@ -20,13 +21,34 @@ function ownAnswer(userId: string, questionId: string) {
   return a && !a.skipped && a.value !== null ? a.value : null;
 }
 
-/** The partner's shares as the acting persona's Buddy may see them. */
+/** A moment-only hint counts only while its moment is happening (mirrors hint_trigger_active). */
+function momentOk(share: BuddyShare, authorId: string): boolean {
+  if (!share.showWhen) return true;
+  const s = demoStore.get();
+  return hintMomentActive(share.showWhen, { authorId, flags: s.distanceFlags, lifeChanges: s.lifeChanges, pulses: s.pulses, now: new Date() });
+}
+
+/**
+ * The partner's shares as the acting persona's Buddy may see them: hint/open
+ * only, ONLY on questions this persona has answered too (answer to unlock,
+ * Module H), and moment-only hints only in their moment. Mirrors the RLS policy.
+ */
 export function partnerSharesFor(userId: string): PartnerShare[] {
   const partner = partnerOf(userId);
   if (!partner) return [];
   return (demoStore.get().buddyShares[partner] ?? [])
-    .filter((x) => x.level === "hint" || x.level === "open")
-    .map((x) => ({ questionId: x.questionId, level: x.level, text: x.text }));
+    .filter((x) => (x.level === "hint" || x.level === "open") && ownAnswer(userId, x.questionId) !== null && momentOk(x, partner))
+    .map((x) => ({ questionId: x.questionId, level: x.level, text: x.text, showWhen: x.showWhen ?? null }));
+}
+
+/** What the partner shared that this persona hasn't unlocked yet (mirrors partner_share_teasers). */
+export function teasersFor(userId: string): ShareTeaser[] {
+  const partner = partnerOf(userId);
+  if (!partner) return [];
+  return (demoStore.get().buddyShares[partner] ?? [])
+    .filter((x) => (x.level === "hint" || x.level === "open") && ownAnswer(userId, x.questionId) === null && momentOk(x, partner))
+    .map((x) => ({ questionId: x.questionId, level: x.level }))
+    .sort((a, b) => a.questionId.localeCompare(b.questionId));
 }
 
 export const buddy: Backend["buddy"] = {
@@ -66,7 +88,14 @@ export const buddy: Backend["buddy"] = {
     return (demoStore.get().buddyShares[uid] ?? []).map(copyShare);
   },
 
-  async share(questionId, level, hint) {
+  async partnerHints() {
+    await tick(60);
+    const uid = me();
+    myCouple();
+    return { shares: partnerSharesFor(uid), teasers: teasersFor(uid) };
+  },
+
+  async share(questionId, level, hint, showWhen = null) {
     await tick();
     const uid = me();
     myCouple();
@@ -87,7 +116,8 @@ export const buddy: Backend["buddy"] = {
     } catch (error) {
       throw new UserFacingError(error instanceof Error ? error.message : "That hint doesn't look right.");
     }
-    const share: BuddyShare = { questionId, level, text, updatedAt: nowIso() };
+    if (showWhen !== null && showWhen !== undefined && !isHintMoment(showWhen)) throw new UserFacingError("Pick when this hint should show.");
+    const share: BuddyShare = { questionId, level, text, updatedAt: nowIso(), showWhen: level === "hint" ? (showWhen ?? null) : null };
     demoStore.update((s) => {
       const list = (s.buddyShares[uid] ??= []);
       const i = list.findIndex((x) => x.questionId === questionId);

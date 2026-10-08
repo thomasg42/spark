@@ -23,7 +23,7 @@ describe("demo private answers", () => {
     actAs(DEMO_SAM);
     const all = await answers.list();
     const beginnings = await answers.list("beginnings");
-    expect(all.map((a) => a.questionId).sort()).toEqual(["conflict_tendency", "feel_close_when", "leave_behind", "love_language", "trust_hurts", "trust_level", "what_attracted_you"]);
+    expect(all.map((a) => a.questionId).sort()).toEqual(["conflict_tendency", "dont_take_personally", "feel_close_when", "leave_behind", "love_language", "trust_hurts", "trust_level", "what_attracted_you"]);
     const seen = JSON.stringify([all, beginnings]);
     for (const a of alexSeed) expect(seen).not.toContain(String(a.value));
     expect(seen).not.toContain("Trivia night");
@@ -32,7 +32,7 @@ describe("demo private answers", () => {
   it("acting as Alex, returns only Alex's answers", async () => {
     actAs(DEMO_ALEX);
     const all = await answers.list();
-    expect(all.map((a) => a.questionId).sort()).toEqual(["how_we_met_mine", "what_attracted_you"]);
+    expect(all.map((a) => a.questionId).sort()).toEqual(["conflict_tendency", "dont_take_personally", "feel_close_when", "how_we_met_mine", "love_language", "what_attracted_you"]);
     expect(JSON.stringify(all)).not.toContain("kind to the bartender");
   });
 

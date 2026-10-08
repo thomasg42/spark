@@ -28,6 +28,10 @@ describe("buddy_shares", () => {
         [sam, coupleId, CT],
       ),
     );
+    // Answer to unlock (Module H): Alex answers the same questions, so Sam's shares on them are readable.
+    await asUser(db, alex, (tx) =>
+      tx.query(`insert into public.private_answers (user_id, section, question_id, answer_ciphertext) values ($1, 'roots', 'love_language', $2), ($1, 'closeness_trust', 'trust_hurts', $2)`, [alex, CT]),
+    );
   });
 
   it("the partner can read hint/open shares; outsiders and signed-out visitors can't", async () => {

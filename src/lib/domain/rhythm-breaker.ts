@@ -12,13 +12,21 @@ import { UserFacingError, type Activity, type DateRule, type LifeChangeInput, ty
 import { addDays, parseISODate, previousWeekStart, toISODate, weekStartOf, type ISODate } from "./dates";
 import { evaluateRhythm, type SignalKind, type SuggestionKind } from "./triggers";
 
-export const LIFE_CHANGE_KINDS: readonly LifeChangeKind[] = ["new_job", "new_schedule", "move", "other"];
-export const LIFE_CHANGE_COPY: Record<LifeChangeKind, { label: string; emoji: string }> = {
-  new_job: { label: "New job", emoji: "💼" },
-  new_schedule: { label: "New schedule", emoji: "🗓" },
-  move: { label: "A move", emoji: "📦" },
-  other: { label: "Something else big", emoji: "✨" },
+export const LIFE_CHANGE_KINDS: readonly LifeChangeKind[] = ["new_job", "new_schedule", "move", "other", "trip", "work_stretch"];
+export const LIFE_CHANGE_COPY: Record<LifeChangeKind, { label: string; emoji: string; effect: string }> = {
+  new_job: { label: "New job", emoji: "💼", effect: "Check-ins come a little more often for six weeks." },
+  new_schedule: { label: "New schedule", emoji: "🗓", effect: "Check-ins come a little more often for six weeks." },
+  move: { label: "A move", emoji: "📦", effect: "Check-ins come a little more often for six weeks." },
+  other: { label: "Something else big", emoji: "✨", effect: "Check-ins come a little more often for six weeks." },
+  trip: { label: "A trip apart", emoji: "🧳", effect: "Any hints set for times apart show while it's on." },
+  work_stretch: { label: "A long work stretch", emoji: "🛠", effect: "Any hints set for times apart show while it's on." },
 };
+
+/** Big changes speed up the rhythm; time apart (a trip, a long work stretch) only unlocks "when we're apart" hints. */
+export const BOOSTING_KINDS: readonly LifeChangeKind[] = ["new_job", "new_schedule", "move", "other"];
+export function boostingChanges<T extends { kind: LifeChangeKind }>(changes: T[]): T[] {
+  return changes.filter((c) => BOOSTING_KINDS.includes(c.kind));
+}
 export const LIFE_CHANGE_NOTE_MAX = 280;
 /** A change can be logged ahead of time (a move next month), up to this far. */
 export const LIFE_CHANGE_AHEAD_DAYS = 180;
@@ -91,7 +99,7 @@ export function rhythmCards(input: RhythmCardsInput): RhythmCard[] {
   const { signals } = evaluateRhythm({
     activities: input.activities.map((a) => ({ happenedOn: a.happenedOn, category: a.category })),
     pulses: input.pulses.map((p) => ({ userId: p.userId, weekStart: p.weekStart, excitement: p.excitement, connection: p.connection })),
-    lifeChanges: input.lifeChanges.map((c) => ({ date: c.happenedOn, kind: c.kind })),
+    lifeChanges: boostingChanges(input.lifeChanges).map((c) => ({ date: c.happenedOn, kind: c.kind as "new_job" | "new_schedule" | "move" | "other" })),
     today: input.today,
   });
   const hasStandingDate = input.rules.some((r) => r.active);

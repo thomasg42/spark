@@ -14,6 +14,7 @@ import { loadCheckinHistory } from "@/components/checkin/history";
 import { useApp } from "@/components/app-provider";
 import { agreedRhythm, type PaceRound, type Rhythm } from "@/lib/domain/rhythm";
 import type { LifeChange } from "@/lib/domain/cadence";
+import { boostingChanges } from "@/lib/domain/rhythm-breaker";
 
 // Live mode only: a revealed month is final, so it is decrypted once per session.
 // Demo reads are local and cheap, and a demo reset can rewrite history, so no cache.
@@ -55,7 +56,7 @@ export function useRhythm() {
     if (stage !== "ready" || !user) return;
     // Life changes raise the rhythm for six weeks (Module E); a failed load just means no boost.
     void backend.lifeChanges.list().then(
-      (list) => setChanges(list.map((c) => ({ date: c.happenedOn }))),
+      (list) => setChanges(boostingChanges(list).map((c) => ({ date: c.happenedOn }))),
       () => setChanges([]),
     );
     try {

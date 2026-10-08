@@ -7,6 +7,7 @@ import { checkins } from "./checkins";
 import { couple } from "./couple";
 import { datePlans } from "./date-plans";
 import { dateRules, lifeChanges } from "./rhythm-breaker";
+import { distanceFlags } from "./hints";
 import { ideas } from "./ideas";
 import { media } from "./media";
 import { moments } from "./moments";
@@ -49,6 +50,7 @@ export function createDemoBackend(): Backend {
     datePlans,
     dateRules,
     lifeChanges,
+    distanceFlags,
     projects,
     money,
   };
