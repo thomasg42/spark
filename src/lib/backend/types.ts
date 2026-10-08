@@ -201,6 +201,47 @@ export interface DatePlanInput {
   note?: string | null;
 }
 
+/** A standing date night (Module E): the same night every week. Both partners see it. */
+export interface DateRule {
+  id: string;
+  title: string;
+  /** 0 = Sunday .. 6 = Saturday. */
+  weekday: number;
+  startTime: string; // HH:MM
+  endTime: string; // HH:MM
+  note: string | null;
+  /** Paused rules stay listed but don't come around. */
+  active: boolean;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface DateRuleInput {
+  title: string;
+  weekday: number;
+  startTime: string;
+  endTime: string;
+  note?: string | null;
+}
+
+export type LifeChangeKind = "new_job" | "new_schedule" | "move" | "other";
+
+/** A big life change (Module E). Shared by the couple; it raises the check-in rhythm for six weeks. */
+export interface LifeChangeEntry {
+  id: string;
+  kind: LifeChangeKind;
+  happenedOn: ISODate;
+  note: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface LifeChangeInput {
+  kind: LifeChangeKind;
+  happenedOn: ISODate;
+  note?: string | null;
+}
+
 export type ProjectKind = "home" | "family" | "money" | "trip" | "other";
 export type ProjectStatus = "planned" | "active" | "done";
 
@@ -412,6 +453,21 @@ export interface Backend {
     /** Upcoming and recent plans, soonest first. */
     list(): Promise<DatePlan[]>;
     add(input: DatePlanInput): Promise<DatePlan>;
+    remove(id: string): Promise<void>;
+  };
+
+  /** Standing date nights. Both see them; only the person who set one can change, pause or remove it. */
+  dateRules: {
+    list(): Promise<DateRule[]>;
+    add(input: DateRuleInput): Promise<DateRule>;
+    update(id: string, patch: Partial<DateRuleInput> & { active?: boolean }): Promise<DateRule>;
+    remove(id: string): Promise<void>;
+  };
+
+  /** Big life changes, newest first. Both see them; only the person who logged one can remove it. */
+  lifeChanges: {
+    list(): Promise<LifeChangeEntry[]>;
+    add(input: LifeChangeInput): Promise<LifeChangeEntry>;
     remove(id: string): Promise<void>;
   };
 

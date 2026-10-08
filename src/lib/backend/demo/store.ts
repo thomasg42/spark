@@ -18,6 +18,8 @@ import {
   type BuddyTurn,
   type DateIdea,
   type DatePlan,
+  type DateRule,
+  type LifeChangeEntry,
   type Moment,
   type MoneyGoal,
   type Project,
@@ -55,6 +57,10 @@ export interface DemoState {
   /** Per person: their private conversation with their own Buddy. */
   buddyChats: Record<string, BuddyTurn[]>;
   datePlans: DatePlan[];
+  /** Standing date nights (Module E). */
+  dateRules: DateRule[];
+  /** Big life changes (Module E). */
+  lifeChanges: LifeChangeEntry[];
   projects: Project[];
   money: MoneyGoal[];
 }
@@ -70,6 +76,9 @@ function load(): DemoState {
     if (raw) {
       const parsed = JSON.parse(raw) as DemoState;
       if (parsed && parsed.version === 4) {
+        // Added 2026-10-08 (Module E): older saved demos simply start with none.
+        parsed.dateRules ??= [];
+        parsed.lifeChanges ??= [];
         state = parsed;
         return state;
       }

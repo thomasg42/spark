@@ -4,9 +4,9 @@ Phase 1 is built (see README). This is the plan for the rest, in order. Each pha
 
 ## Phase 2: Rhythm and goals
 
-- **Rhythm Breaker engine.** The trigger logic already exists and is unit tested (`src/lib/domain/triggers.ts`): category rut (same categories 3+ weeks), excitement dropping two weeks running, little time together, life changes. Phase 2 adds the UI cards, dismiss/snooze, and tailored actions (new category, surprise, tech-free night) fed by these signals.
-- **Standing date rule with reminders.** For example "every Wednesday 6 to 9 PM: date night, then we each go home." Table `date_rules`, a calendar (.ics) export, and in-app reminders (push arrives in Phase 4).
-- **Life change log.** Table `life_changes` (new job, new schedule, move). The cadence math already raises the check-in rhythm one rung for six weeks (`coupleCadence`).
+- **Rhythm Breaker engine. BUILT 2026-10-08.** Home "A little nudge" cards from the tested signals (`src/lib/domain/rhythm-breaker.ts`), at most two, each with one or two specific actions, "Not now" for a week per person, stale dips ignored.
+- **Standing date rule with reminders. BUILT 2026-10-08.** `/plans/standing/`, table `date_rules` (migration `0600`), weekly-repeat calendar file with a one-hour reminder. Still to do: in-app push reminders (Phase 4).
+- **Life change log. BUILT 2026-10-08.** Table `life_changes`, card on Agreements; raises the quick check-in rhythm one step for six weeks (`agreedRhythm`).
 - **Goals and Projects.** Built 2026-10-06 (Projects ranked list, Money savings goals, shared calendar). Still to do: contribution history per goal, dream list, marriage/kids/home timelines, and a joint monthly "state of us" review.
 - **Spark Buddy follow-ups.** Sync the AI-consent choice across devices (a `profiles.buddy_ai` column; today it is per device and defaults off), push reminders for Buddy-booked dates, and trigger-based hints (show a hint only when a Rhythm Breaker signal fires).
 - **Second questionnaire (after month 1).** Pace, time together, attaching too much / too little / just right, what you want more of.

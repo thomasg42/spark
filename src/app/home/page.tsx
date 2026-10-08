@@ -9,10 +9,12 @@ import { useApp } from "@/components/app-provider";
 import { loadCheckinHistory } from "@/components/checkin/history";
 import { DrillList, DrillRow } from "@/components/drill-row";
 import { RequireStage } from "@/components/require-stage";
+import { RhythmCards } from "@/components/rhythm/rhythm-cards";
 import { Button, Card, ChoiceGroup, useToast } from "@/components/ui";
 import { CADENCE_LABELS } from "@/lib/domain/cadence";
 import { formatDate, periodOf, toISODate, upcomingAnniversaries, weekStartOf } from "@/lib/domain/dates";
 import { quickCheckinDue } from "@/lib/domain/rhythm";
+import { describeRule, upcomingRules } from "@/lib/domain/date-rules";
 import { formatMoney } from "@/lib/domain/plans-rules";
 import { SOCIAL_COPY, socialAgreement } from "@/lib/domain/social";
 import { FAVORITE_CATALOG, loadFavorites, saveFavorites, toggleFavorite, type FavoriteId } from "@/lib/ui/favorites";
@@ -38,7 +40,7 @@ function Dashboard() {
   const wants = (id: FavoriteId) => favorites?.includes(id) ?? false;
   const data = useLoad(async () => {
     if (!favorites) return null;
-    const [story, ideas, notes, answers, history, pulses, plans, projects, money] = await Promise.all([
+    const [story, ideas, notes, answers, history, pulses, plans, rules, projects, money] = await Promise.all([
       settle(backend.story.list()),
       wants("ideas") ? settle(backend.ideas.list()) : null,
       wants("notes") ? settle(backend.notes.list()) : null,
@@ -46,17 +48,19 @@ function Dashboard() {
       wants("monthly") ? settle(loadCheckinHistory(backend, 2)) : null,
       wants("pulse") ? settle(backend.pulse.history(8)) : null,
       settle(backend.datePlans.list()),
+      settle(backend.dateRules.list()),
       wants("projects") ? settle(backend.projects.list()) : null,
       wants("money") ? settle(backend.money.list()) : null,
     ]);
     const week = wants("pulse") ? await settle(backend.pulse.status(weekStartOf(today))) : null;
-    return { story, ideas, notes, answers, history, pulses, week, plans, projects, money };
+    return { story, ideas, notes, answers, history, pulses, week, plans, rules, projects, money };
   }, [backend, user?.id, favorites?.join(",")]);
 
   const partnerName = partner?.nickname || partner?.displayName || "your partner";
   const d = data.data;
   const anniversary = d?.story ? upcomingAnniversaries(d.story, today, 30)[0] : undefined;
   const nextPlan = d?.plans?.find((p) => p.plannedFor >= toISODate(today));
+  const nextStanding = d?.rules ? upcomingRules(d.rules, today)[0] : undefined;
 
   const status = (id: FavoriteId): { text: string; badge?: string | null } => {
     switch (id) {
@@ -118,6 +122,8 @@ function Dashboard() {
     <div className="fade-up">
       <h1 className="text-3xl font-bold text-ink">Hi, {profile?.nickname || profile?.displayName}</h1>
 
+      <RhythmCards />
+
       {anniversary ? (
         <Card className="mt-5 bg-accent-soft">
           <p className="text-sm font-semibold text-accent-text">Coming up</p>
@@ -125,6 +131,17 @@ function Dashboard() {
             {anniversary.entry.title}: {anniversary.years} {anniversary.years === 1 ? "year" : "years"}
           </p>
           <p className="text-sm text-ink">{anniversary.inDays === 0 ? "Today!" : `In ${anniversary.inDays} ${anniversary.inDays === 1 ? "day" : "days"}`}</p>
+        </Card>
+      ) : null}
+
+      {nextStanding && (!nextPlan || nextStanding.on <= nextPlan.plannedFor) ? (
+        <Card className="mt-5">
+          <p className="text-sm font-semibold text-accent-text">{nextStanding.tonight ? "Tonight, just you two" : "Your standing date"}</p>
+          <p className="mt-1 text-lg font-bold text-ink">{nextStanding.rule.title}</p>
+          <p className="text-sm text-ink">
+            {describeRule(nextStanding.rule)}
+            {nextStanding.tonight ? "" : ` · next ${formatDate(nextStanding.on)}`}
+          </p>
         </Card>
       ) : null}
 

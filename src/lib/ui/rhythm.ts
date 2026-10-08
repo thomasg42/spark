@@ -13,6 +13,7 @@ import type { Backend } from "@/lib/backend";
 import { loadCheckinHistory } from "@/components/checkin/history";
 import { useApp } from "@/components/app-provider";
 import { agreedRhythm, type PaceRound, type Rhythm } from "@/lib/domain/rhythm";
+import type { LifeChange } from "@/lib/domain/cadence";
 
 // Live mode only: a revealed month is final, so it is decrypted once per session.
 // Demo reads are local and cheap, and a demo reset can rewrite history, so no cache.
@@ -47,10 +48,16 @@ export async function loadPaceRounds(backend: Backend, userId: string): Promise<
 export function useRhythm() {
   const { backend, user, profile, partner, stage } = useApp();
   const [rounds, setRounds] = useState<PaceRound[] | null>(null);
+  const [changes, setChanges] = useState<LifeChange[]>([]);
   const [error, setError] = useState(false);
 
   const reload = useCallback(async () => {
     if (stage !== "ready" || !user) return;
+    // Life changes raise the rhythm for six weeks (Module E); a failed load just means no boost.
+    void backend.lifeChanges.list().then(
+      (list) => setChanges(list.map((c) => ({ date: c.happenedOn }))),
+      () => setChanges([]),
+    );
     try {
       setRounds(await loadPaceRounds(backend, user.id));
       setError(false);
@@ -64,6 +71,6 @@ export function useRhythm() {
     void reload();
   }, [reload]);
 
-  const rhythm: Rhythm = agreedRhythm(profile?.preferredCadence ?? null, partner?.preferredCadence ?? null, rounds ?? []);
+  const rhythm: Rhythm = agreedRhythm(profile?.preferredCadence ?? null, partner?.preferredCadence ?? null, rounds ?? [], changes);
   return { rhythm, loading: rounds === null, error, reload };
 }

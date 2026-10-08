@@ -48,10 +48,11 @@ function PairFlow() {
 
   const share = async () => {
     if (!inviteLink || !couple?.inviteCode) return;
-    const text = `Join me on Spark. Use code ${formatCode(couple.inviteCode)} or open this link:`;
+    // Thomas's wording (2026-10-08).
+    const text = `Hey, your partner wants to level up with you. Hop in and let's make this relationship the best it can be. Use code ${formatCode(couple.inviteCode)} or open this link:`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Join me on Spark", text, url: inviteLink });
+        await navigator.share({ title: "Your partner wants to level up with you", text, url: inviteLink });
         return;
       }
     } catch {

@@ -4,6 +4,7 @@ import { useApp } from "@/components/app-provider";
 import { Avatar, Button, Card, ChoiceGroup, Notice, useToast } from "@/components/ui";
 import type { PickableCadence } from "@/lib/backend/types";
 import { CADENCE_LABELS, PICKABLE_CADENCES } from "@/lib/domain/cadence";
+import { formatDate } from "@/lib/domain/dates";
 import { useAction } from "@/lib/ui/hooks";
 import { CadenceLadder } from "./cadence-ladder";
 import { useRhythm } from "@/lib/ui/rhythm";
@@ -116,13 +117,18 @@ export function RhythmCard() {
         <p className="text-sm font-semibold text-accent-text">Your shared rhythm</p>
         {view.agreedLabel ? (
           <p key={view.agreed} className="pop mt-1 font-display text-3xl font-bold text-ink">
-            {rhythm.current && rhythm.steps !== 0 ? CADENCE_LABELS[rhythm.current] : view.agreedLabel}
+            {rhythm.current && (rhythm.steps !== 0 || rhythm.boostedUntil) ? CADENCE_LABELS[rhythm.current] : view.agreedLabel}
           </p>
         ) : (
           <p className="mt-1 font-display text-2xl font-bold text-ink">Waiting for {partnerName}</p>
         )}
         <p className="mx-auto mt-1 max-w-md text-sm text-ink">{view.explanation}</p>
         {votesNote ? <p className="mx-auto mt-2 max-w-md text-sm font-semibold text-accent-text">{votesNote}</p> : null}
+        {rhythm.boostedUntil ? (
+          <p className="mx-auto mt-2 max-w-md text-sm font-semibold text-accent-text">
+            A big change is happening, so quick check-ins come a little more often until {formatDate(rhythm.boostedUntil)}.
+          </p>
+        ) : null}
       </div>
 
       <CadenceLadder steps={view.steps} partnerName={partnerName} />

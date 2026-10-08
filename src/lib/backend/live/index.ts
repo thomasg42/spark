@@ -6,6 +6,7 @@ import { buddy } from "./buddy";
 import { checkins } from "./checkins";
 import { couple } from "./couple";
 import { datePlans } from "./date-plans";
+import { dateRules, lifeChanges } from "./rhythm-breaker";
 import { ideas } from "./ideas";
 import { media } from "./media";
 import { moments } from "./moments";
@@ -17,5 +18,5 @@ import { pulse } from "./pulse";
 import { story } from "./story";
 
 export function createLiveBackend(): Backend {
-  return { mode: "live", auth, profiles, couple, media, story, answers, pulse, checkins, notes, activities, ideas, moments, buddy, datePlans, projects, money };
+  return { mode: "live", auth, profiles, couple, media, story, answers, pulse, checkins, notes, activities, ideas, moments, buddy, datePlans, dateRules, lifeChanges, projects, money };
 }

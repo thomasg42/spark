@@ -34,6 +34,8 @@ export function freshState(): DemoState {
     buddyShares: {},
     buddyChats: {},
     datePlans: [],
+    dateRules: [],
+    lifeChanges: [],
     projects: [],
     money: [],
   };
@@ -214,6 +216,8 @@ export function buildSeed(today: Date): DemoState {
     },
     buddyChats: {},
     datePlans: [],
+    dateRules: [],
+    lifeChanges: [],
     projects: [
       { id: "seed-project-1", title: "Paint the baby's room (pick the right color first)", kind: "family", status: "active", rank: 1, targetDate: day(30), budgetCents: 25000, note: "Order three sample pots and test them on the wall in daylight.", createdBy: DEMO_SAM, createdAt: at(-14), updatedAt: at(-2) },
       { id: "seed-project-2", title: "Finish the garage", kind: "home", status: "active", rank: 2, targetDate: day(60), budgetCents: 120000, note: null, createdBy: DEMO_ALEX, createdAt: at(-13), updatedAt: at(-13) },

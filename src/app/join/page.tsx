@@ -21,7 +21,7 @@ function JoinInner() {
   if (stage === "loading" || stage === "needsPartner" || stage === "needsProfile" || stage === "ready") return <LoadingBlock />;
   return (
     <>
-      <PageHeader title="You've been invited to Spark" subtitle="A private space for the two of you." />
+      <PageHeader title="Your partner wants to level up with you" subtitle="Hop in and let's make this relationship the best it can be. A private space for the two of you." />
       <Card>
         <p className="text-ink">
           Your invite code is <span className="font-mono font-bold tracking-widest">{code || "missing"}</span>. Sign in first, set up your profile, and we'll pair you automatically.

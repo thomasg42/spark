@@ -7,11 +7,12 @@
  *    moves ONE step only when they agree: both "sooner" = one step more often,
  *    both "later" = one step more space. Any other combination keeps the pace,
  *    so nobody is pushed by the other's vote.
- * 3. The rhythm decides how often the quick check-in pops up between monthly
+ * 3. A logged life change (Module E) moves it one step more often for six weeks.
+ * 4. The rhythm decides how often the quick check-in pops up between monthly
  *    check-ins. The monthly check-in itself pops up every month until done.
  */
-import { CADENCE_INTERVAL_DAYS, CADENCE_LADDER, negotiateCadence, type Cadence } from "./cadence";
-import { addDays, daysBetween, parseISODate, type ISODate } from "./dates";
+import { boostCadence, CADENCE_INTERVAL_DAYS, CADENCE_LADDER, LIFE_CHANGE_BOOST_DAYS, lifeChangeBoostActive, negotiateCadence, type Cadence, type LifeChange } from "./cadence";
+import { addDays, daysBetween, parseISODate, toISODate, type ISODate } from "./dates";
 
 export type PaceVote = "sooner" | "same" | "later";
 
@@ -39,12 +40,17 @@ export interface Rhythm {
   steps: number;
   /** Each counted round with its effect, oldest first. */
   rounds: Array<PaceRound & { shift: PaceShift; from: Cadence; to: Cadence }>;
+  /**
+   * Set while a logged life change (new job, new schedule, move) has the rhythm
+   * one step more often: the last day of the boost. Null otherwise (Module E).
+   */
+  boostedUntil?: ISODate | null;
 }
 
 const rung = (c: Cadence) => CADENCE_LADDER.indexOf(c);
 
-export function agreedRhythm(mine: Cadence | null, partner: Cadence | null, rounds: PaceRound[]): Rhythm {
-  if (!mine || !partner) return { base: null, current: null, steps: 0, rounds: [] };
+export function agreedRhythm(mine: Cadence | null, partner: Cadence | null, rounds: PaceRound[], lifeChanges: LifeChange[] = [], today: Date = new Date()): Rhythm {
+  if (!mine || !partner) return { base: null, current: null, steps: 0, rounds: [], boostedUntil: null };
   const base = negotiateCadence(mine, partner);
   let index = rung(base);
   const applied: Rhythm["rounds"] = [];
@@ -54,8 +60,25 @@ export function agreedRhythm(mine: Cadence | null, partner: Cadence | null, roun
     index = Math.min(CADENCE_LADDER.length - 1, Math.max(0, index + shift));
     applied.push({ ...round, shift, from, to: CADENCE_LADDER[index]! });
   }
-  const current = CADENCE_LADDER[index]!;
-  return { base, current, steps: index - rung(base), rounds: applied };
+  const voted = CADENCE_LADDER[index]!;
+  // A big life change: check in one step more often for six weeks (never past daily).
+  const boost = voted !== "daily" ? lifeChangeBoostUntil(lifeChanges, today) : null;
+  const current = boost ? boostCadence(voted) : voted;
+  return { base, current, steps: index - rung(base), rounds: applied, boostedUntil: boost };
+}
+
+/** The last day of the newest active life-change boost, or null when none is active. */
+export function lifeChangeBoostUntil(changes: LifeChange[], today: Date): ISODate | null {
+  if (!lifeChangeBoostActive(changes, today)) return null;
+  const newest = changes
+    .filter((c) => {
+      const age = daysBetween(parseISODate(c.date), today);
+      return age >= 0 && age < LIFE_CHANGE_BOOST_DAYS;
+    })
+    .map((c) => c.date)
+    .sort()
+    .at(-1)!;
+  return toISODate(addDays(parseISODate(newest), LIFE_CHANGE_BOOST_DAYS - 1));
 }
 
 /** Plain-language result of one revealed round, for the monthly check-in page. */

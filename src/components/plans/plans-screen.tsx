@@ -10,24 +10,29 @@ import { useAction, useLoad } from "@/lib/ui/hooks";
 import type { Activity } from "@/lib/backend/types";
 import { DrillList, DrillRow } from "@/components/drill-row";
 import { formatMoney } from "@/lib/domain/plans-rules";
+import { describeRule, upcomingRules } from "@/lib/domain/date-rules";
 
 /** Projects, Money and the shared calendar, above the activity log. */
 function PlansHub() {
   const { backend, user, nameOf } = useApp();
   const toast = useToast();
   const data = useLoad(async () => {
-    const [projects, money, plans] = await Promise.all([backend.projects.list(), backend.money.list(), backend.datePlans.list()]);
-    return { projects, money, plans };
+    const [projects, money, plans, rules] = await Promise.all([backend.projects.list(), backend.money.list(), backend.datePlans.list(), backend.dateRules.list()]);
+    return { projects, money, plans, rules };
   }, [backend, user?.id]);
   const open = data.data?.projects.filter((p) => p.status !== "done") ?? [];
   const joint = data.data?.money.filter((g) => g.scope === "joint") ?? [];
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = (data.data?.plans ?? []).filter((p) => p.plannedFor >= today).slice(0, 4);
+  const standing = data.data ? upcomingRules(data.data.rules, new Date())[0] : undefined;
   return (
     <div className="mb-6">
       <DrillList label="Plans">
         <li>
           <DrillRow href="/plans/projects/" icon="🔨" title="Projects" status={open.length ? `1. ${open[0]!.title}${open.length > 1 ? ` · ${open.length - 1} more` : ""}` : "What you're working on, in priority order"} />
+        </li>
+        <li>
+          <DrillRow href="/plans/standing/" icon="◷" title="Standing date night" status={standing ? `${describeRule(standing.rule)}${standing.tonight ? " · tonight" : ""}` : "The same night every week, set once"} />
         </li>
         <li>
           <DrillRow href="/plans/money/" icon="💵" title="Money" status={joint.length ? `${formatMoney(joint.reduce((n, g) => n + g.savedCents, 0))} saved together` : "Savings goals, yours and joint"} />
