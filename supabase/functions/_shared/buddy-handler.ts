@@ -24,6 +24,8 @@
  *   share  { questionId, level, hint? }       -> { share | null }
  *   unshare { questionId }                    -> { ok }
  *   draft_hint { questionId, aiConsent }      -> { hint, source }  (Claude only with consent)
+ *   speak  { text, mood, aiConsent }          -> { audio: base64 mp3 | null }  studio voice (ElevenLabs)
+ *          only with aiConsent, metered per person per day; null means "use the device voice"
  *   clear                                     -> { ok }
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -36,7 +38,9 @@ import {
   fallbackHint,
   fallbackReply,
   isShareLevel,
+  MAX_SPEAK_CHARS_PER_DAY,
   MAX_USER_MESSAGES_PER_DAY,
+  SPEAK_CHUNK_MAX,
   MESSAGE_MAX,
   parseBuddyJson,
   sanitizeClientContext,
@@ -52,6 +56,7 @@ import { mentionsCrisis } from "./crisis.ts";
 import { aad, scopes, type Sealer } from "./crypto.ts";
 import { dbError, HttpError, type Handler } from "./http.ts";
 import type { JsonGenerator, JsonResult } from "./llm.ts";
+import { toBase64, type VoiceRenderer } from "./voice.ts";
 import { findQuestion, type AnswerValue } from "./questionnaires.ts";
 
 export interface ShareRow {
@@ -83,6 +88,8 @@ export interface BuddyRepo {
   insertMessages(rows: Array<{ id: string; coupleId: string; role: "user" | "buddy"; ciphertext: string }>): Promise<void>;
   clearMessages(): Promise<void>;
   userMessagesSince(sinceIso: string): Promise<number>;
+  /** Adds to the caller's studio-voice meter for today and returns today's total. */
+  chargeVoice(chars: number): Promise<number>;
 }
 
 const SHARE_COLUMNS = "user_id, question_id, level, shared_ciphertext, updated_at";
@@ -150,6 +157,11 @@ export function createSupabaseBuddyRepo(supabase: SupabaseClient, userId: string
       const { error } = await supabase.from("buddy_messages").delete().eq("user_id", userId);
       if (error) dbError(error, "Could not clear your conversation.");
     },
+    async chargeVoice(chars) {
+      const { data, error } = await supabase.rpc("buddy_voice_charge", { p_chars: chars });
+      if (error) dbError(error, "Could not check your voice usage.");
+      return Number(data ?? 0);
+    },
     async userMessagesSince(sinceIso) {
       const { count, error } = await supabase
         .from("buddy_messages")
@@ -185,6 +197,8 @@ export interface BuddyDeps {
   sealer: Sealer | null;
   /** Claude, or null/undefined when ANTHROPIC_API_KEY is not configured. */
   generate?: JsonGenerator | null;
+  /** The studio voice, or null/undefined when ELEVENLABS_API_KEY is not configured. */
+  voice?: VoiceRenderer | null;
   now?: () => Date;
   newId?: () => string;
 }
@@ -371,6 +385,25 @@ export function createBuddyHandler(deps: BuddyDeps): Handler {
           }
         }
         return { hint: fallbackHint(question.id, value), source: "fallback" };
+      }
+
+      case "speak": {
+        // Buddy's words go to the voice provider only with the same consent as AI replies.
+        // Every "no" below resolves { audio: null }: the app then speaks with the device voice.
+        // reason tells the app whether to keep trying the studio voice: "off" and "limited"
+        // last (no voice configured / today's quota used); "failed" and "crisis" are one-offs.
+        if (!deps.voice) return { audio: null, reason: "off" };
+        if (body.aiConsent !== true) return { audio: null, reason: "consent" };
+        const text = typeof body.text === "string" ? body.text.replace(/\s+/g, " ").trim() : "";
+        if (!text) throw new HttpError(400, "Nothing to say.");
+        if (Array.from(text).length > SPEAK_CHUNK_MAX) throw new HttpError(400, "That's too long to say at once.");
+        if (mentionsCrisis(text)) return { audio: null, reason: "crisis" }; // never route crisis wording to a third party
+        const mood = body.mood === "calm" ? "calm" : "lively";
+        // Charge exactly what the provider bills (performance tags included), before spending it.
+        const used = await deps.repo.chargeVoice(deps.voice.billedChars(text, mood));
+        if (used > MAX_SPEAK_CHARS_PER_DAY) return { audio: null, reason: "limited" };
+        const audio = await deps.voice.render(text, mood);
+        return audio ? { audio: toBase64(audio), mime: "audio/mpeg", reason: null } : { audio: null, reason: "failed" };
       }
 
       case "clear":

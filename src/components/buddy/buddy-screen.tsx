@@ -15,6 +15,9 @@ import type { Draft } from "@/components/questions/flow";
 import { Badge, Button, Card, Notice, PageHeader, ProgressBar, Spinner, TextAreaField, useToast } from "@/components/ui";
 import { messageOf, type BuddyTurn, type ShareLevel } from "@/lib/backend/types";
 import { useAiConsent } from "@/lib/buddy/ai-consent";
+import { parseConfirm, parseTrustLevel, questionToSpeech } from "@/lib/buddy/voice/spoken-intents";
+import { MicBlockedError, useBuddyVoice, VoiceUnavailableError } from "./use-buddy-voice";
+import { VoicePanel } from "./voice-panel";
 import { buildBuddyContext } from "@/lib/buddy/context";
 import { describeAction, NAV_HREF, runAction } from "@/lib/buddy/actions";
 import { cx } from "@/lib/ui/cx";
@@ -45,22 +48,6 @@ function loadAuto(uid: string): boolean {
   }
 }
 
-type SpeechCtor = new () => {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void) | null;
-  onend: (() => void) | null;
-  onerror: (() => void) | null;
-  start(): void;
-  stop(): void;
-};
-function speechCtor(): SpeechCtor | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as { SpeechRecognition?: SpeechCtor; webkitSpeechRecognition?: SpeechCtor };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-}
-
 let counter = 0;
 const keyOf = () => `t${Date.now().toString(36)}${++counter}`;
 
@@ -84,15 +71,60 @@ export function BuddyScreen() {
   const [trustFor, setTrustFor] = useState<Question | null>(null);
   const [auto, setAuto] = useState(true);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [listening, setListening] = useState(false);
-  const recognizer = useRef<InstanceType<SpeechCtor> | null>(null);
+  const [showVoice, setShowVoice] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceHint, setVoiceHint] = useState<string | null>(null);
+  const [hintRequest, setHintRequest] = useState(0);
+  const [announce, setAnnounce] = useState("");
+  /** True while the conversation is being driven by voice (so hands-free can keep it going). */
+  const voiceMode = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const talkRef = useRef<HTMLButtonElement>(null);
+
+  /*
+   * The hands-free chain (speak -> listen -> handle -> speak ...) runs across many
+   * renders, so everything it reads goes through refs that always hold the latest
+   * value. Reading render-time state there once shared an EARLIER answer openly
+   * and confirmed an older suggestion card (review, 2026-10-08).
+   */
+  const trustForRef = useRef<Question | null>(null); // set at the same moment as trustFor
+  const itemsRef = useRef<ChatItem[] | null>(null);
+  itemsRef.current = items;
+  const sendingRef = useRef(false);
+  /** The one suggestion Buddy just offered out loud ("Want me to do it? Just say yes."). */
+  const pendingConfirm = useRef<{ key: string; action: BuddyAction } | null>(null);
+  const handleSpokenRef = useRef<(heard: string) => Promise<void>>(async () => undefined);
+  const voiceTurnRef = useRef<(opts?: { auto?: boolean }) => Promise<void>>(async () => undefined);
 
   const ai = useAiConsent(user?.id);
   const live = backend.mode === "live";
   const question = interviewing && !trustFor ? nextInterviewQuestion(done) : null;
   const progress = interviewProgress(done);
-  const canSpeak = useMemo(() => speechCtor() !== null, []);
+
+  // The studio (server) voice: live mode, AI turned on, and only while the server has one to offer.
+  const [studioVoice, setStudioVoice] = useState(true);
+  const serverVoice = useMemo(
+    () =>
+      live && ai.aiOn && studioVoice
+        ? async (chunk: string, mood?: "lively" | "calm") => {
+            const result = await backend.buddy.speak(chunk, true, mood);
+            // Stop asking only when it can't help for the rest of the visit; one failed clip is just a blip.
+            if (result.reason === "off" || result.reason === "limited") setStudioVoice(false);
+            return result.audio;
+          }
+        : null,
+    [live, ai.aiOn, studioVoice, backend],
+  );
+  const voice = useBuddyVoice(user?.id, serverVoice);
+  const voiceRef = useRef(voice);
+  voiceRef.current = voice;
+  const spokenAloud = voice.prefs.speak && voice.canSpeak;
+
+  /** Changing AI consent silences Buddy at once, so no more of the reply goes to the studio voice. */
+  const setAi = (on: boolean) => {
+    voice.hush();
+    ai.set(on);
+  };
 
   useEffect(() => {
     if (user) setAuto(loadAuto(user.id));
@@ -123,19 +155,56 @@ export function BuddyScreen() {
   }, [question?.id]);
 
   const push = (...more: ChatItem[]) => setItems((list) => [...(list ?? []), ...more]);
-  const say = (textOut: string, extra: Partial<ChatItem> = {}) => push({ role: "buddy", text: textOut, at: new Date().toISOString(), key: keyOf(), ...extra });
+  /** Adds a Buddy message to the chat and returns its key. */
+  const say = (textOut: string, extra: Partial<ChatItem> = {}) => {
+    const key = keyOf();
+    push({ role: "buddy", text: textOut, at: new Date().toISOString(), key, ...extra });
+    if (spokenAloud) setAnnounce("Buddy replied."); // the reply itself is heard, not read twice
+    return key;
+  };
+  const setTrust = (q: Question | null) => {
+    trustForRef.current = q;
+    setTrustFor(q);
+  };
 
-  function startInterview() {
+  /** Says something; then, in a hands-free voice conversation, listens for the answer. */
+  async function speakThenListen(textOut: string, opts: { calm?: boolean } = {}) {
+    const finished = await voiceRef.current.say(textOut, opts);
+    // Stopped, Esc, page hidden or interrupted: the person took the floor, so never re-open the mic.
+    if (!finished) return;
+    await new Promise((resolve) => setTimeout(resolve, 0)); // let React commit what changed while Buddy spoke
+    const v = voiceRef.current;
+    if (voiceMode.current && v.prefs.handsFree && v.canListen) void voiceTurnRef.current({ auto: true });
+  }
+
+  function startInterview(lead = ""): string {
     setInterviewing(true);
-    setTrustFor(null);
+    setTrust(null);
     const next = nextInterviewQuestion(done);
-    if (!next) say(`You've answered everything I have, ${myName}. You can change any answer in Questions.`, { actions: [{ type: "open", to: "questions" }] });
+    if (!next) {
+      const msg = `You've answered everything I have, ${myName}. You can change any answer in Questions.`;
+      say(msg, { actions: [{ type: "open", to: "questions" }] });
+      return `${lead} ${msg}`.trim();
+    }
+    return `${lead} ${questionToSpeech(next)}`.trim();
+  }
+
+  const TRUST_ASK = "Do you trust this to your Spark Buddy? Say off the table, hint, or open.";
+
+  /** After the trust question: move on and ask the next interview question out loud. */
+  function afterTrust(level: ShareLevel, answered: Question | null) {
+    setTrust(null);
+    const saved = new Set(done);
+    if (answered) saved.add(answered.id);
+    const next = nextInterviewQuestion(saved);
+    const lead = level === "private" ? "Off the table it is." : level === "hint" ? "Hint approved." : "Shared openly.";
+    void speakThenListen(next ? `${lead} ${questionToSpeech(next)}` : `${lead} That's everything for now. Amazing work!`);
   }
 
   async function saveAnswer(q: Question, value: AnswerValue) {
     await backend.answers.save(q.id, value);
     setDone((d) => new Set(d).add(q.id));
-    setTrustFor(q);
+    setTrust(q);
   }
 
   async function skipQuestion(q: Question) {
@@ -147,11 +216,17 @@ export function BuddyScreen() {
     }
   }
 
-  async function send(raw: string) {
+  async function send(raw: string, viaVoice = false) {
     const message = raw.trim();
-    if (!message || sending || !user) return;
+    if (!message || sendingRef.current || !user) return;
+    voiceMode.current = viaVoice;
+    pendingConfirm.current = null; // a new message moves on from any earlier suggestion
+    if (!viaVoice) voice.hush();
+    sendingRef.current = true;
     setSending(true);
     setSendError(null);
+    setVoiceError(null);
+    setVoiceHint(null);
     setText("");
     push({ role: "user", text: message, at: new Date().toISOString(), key: keyOf() });
     try {
@@ -161,27 +236,50 @@ export function BuddyScreen() {
       // In the interview, an answer proposal fills the card (and saves it, with auto-save on).
       const answer = question ? reply.actions.find((a) => (a.type === "save_answer" || a.type === "skip_question") && a.questionId === question.id) : undefined;
       const rest = reply.actions.filter((a) => a !== answer);
-      say(reply.reply, { actions: rest, crisis: reply.crisis });
-      if (answer && question) {
-        if (answer.type === "skip_question") await skipQuestion(question);
-        else if (answer.type === "save_answer") {
-          setDraft(answer.value as Draft);
-          if (auto) await saveAnswer(question, answer.value);
-        }
+      const key = say(reply.reply, { actions: rest, crisis: reply.crisis });
+      // What Buddy says out loud: the reply, then whatever it is now waiting on.
+      let spoken = reply.reply;
+      if (reply.crisis) {
+        // Calm, on this device only (never the studio voice), and never followed by an open mic.
+        voiceMode.current = false;
+        void voice.say(spoken, { calm: true, deviceOnly: true });
+        return;
       }
-      if (reply.startInterview) startInterview();
+      if (answer && question) {
+        if (answer.type === "skip_question") {
+          await skipQuestion(question);
+          const next = nextInterviewQuestion(new Set(done).add(question.id));
+          if (next) spoken += ` ${questionToSpeech(next)}`;
+        } else if (answer.type === "save_answer") {
+          setDraft(answer.value as Draft);
+          if (auto) {
+            await saveAnswer(question, answer.value);
+            spoken += ` ${TRUST_ASK}`;
+          } else spoken += " Tap Save and next if that's right.";
+        }
+      } else if (question) {
+        spoken += ` ${questionToSpeech(question)}`;
+      }
+      if (reply.startInterview) spoken = startInterview(spoken);
+      if (rest.length === 1 && rest[0]!.type !== "open") {
+        pendingConfirm.current = { key, action: rest[0]! };
+        spoken += " Want me to do it? Just say yes.";
+      }
+      void speakThenListen(spoken);
     } catch (e) {
       setSendError(messageOf(e));
       setText(message);
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   }
 
-  async function confirm(item: ChatItem, action: BuddyAction, index: number) {
+  async function confirm(item: ChatItem, action: BuddyAction, index: number): Promise<string | null> {
+    if (pendingConfirm.current?.action === action) pendingConfirm.current = null;
     if (action.type === "open") {
       router.push(NAV_HREF[action.to].href);
-      return;
+      return null;
     }
     const id = `${item.key}:${index}`;
     setBusyAction(id);
@@ -190,46 +288,111 @@ export function BuddyScreen() {
       if (action.type === "save_answer") setDone((d) => new Set(d).add(action.questionId));
       setItems((list) => (list ?? []).map((x) => (x.key === item.key ? { ...x, actions: x.actions?.filter((_, i) => i !== index) } : x)));
       if (msg) toast.show(msg);
+      return msg || "Done.";
     } catch (e) {
       toast.show(messageOf(e), "error");
+      return null;
     } finally {
       setBusyAction(null);
     }
   }
 
   function dismiss(item: ChatItem, index: number) {
+    const action = item.actions?.[index];
+    if (action && pendingConfirm.current?.action === action) pendingConfirm.current = null;
     setItems((list) => (list ?? []).map((x) => (x.key === item.key ? { ...x, actions: x.actions?.filter((_, i) => i !== index) } : x)));
   }
 
-  function toggleMic() {
-    const Ctor = speechCtor();
-    if (!Ctor) return;
-    if (listening) {
-      recognizer.current?.stop();
+  /** One spoken turn: listen, then route what was heard (through the latest render's handler). */
+  async function voiceTurn(opts: { auto?: boolean } = {}) {
+    const v = voiceRef.current;
+    if (v.isListening() || sendingRef.current) return;
+    setVoiceError(null);
+    setVoiceHint(null);
+    let heard: string | null;
+    try {
+      heard = await v.listen();
+    } catch (e) {
+      voiceMode.current = false;
+      // Re-opening the mic on its own can be refused (iPhones want a tap): ask for the tap, don't alarm.
+      if (opts.auto) setVoiceHint("Your turn! Tap Talk to answer.");
+      else setVoiceError(e instanceof MicBlockedError || e instanceof VoiceUnavailableError ? e.message : messageOf(e));
       return;
     }
-    const rec = new Ctor();
-    rec.lang = "en-US";
-    rec.interimResults = true;
-    rec.continuous = true;
-    const base = text ? `${text.trim()} ` : "";
-    rec.onresult = (e) => {
-      let said = "";
-      for (let i = 0; i < e.results.length; i++) said += e.results[i]![0]!.transcript;
-      setText(`${base}${said}`.slice(0, MESSAGE_MAX));
-    };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    recognizer.current = rec;
-    setListening(true);
-    rec.start();
+    if (heard === null) return; // cancelled on purpose: not an error
+    if (!heard) {
+      voiceMode.current = false; // silence ends hands-free, so the mic never stays open on its own
+      setVoiceHint("I didn't catch that. Tap Talk to try again, or type below.");
+      return;
+    }
+    await handleSpokenRef.current(heard);
   }
+  voiceTurnRef.current = voiceTurn;
+
+  /** Routes a spoken reply: the trust question, a yes/no to Buddy's offer, or a normal message. */
+  async function handleSpoken(heard: string) {
+    voiceMode.current = true;
+    const userSaid = () => push({ role: "user", text: heard, at: new Date().toISOString(), key: keyOf() });
+    const pendingTrust = trustForRef.current; // the exact answer the trust question is about, right now
+    if (pendingTrust) {
+      const level = parseTrustLevel(heard);
+      if (level === "private") {
+        userSaid();
+        return afterTrust("private", pendingTrust);
+      }
+      if (level === "open") {
+        userSaid();
+        try {
+          await backend.buddy.share(pendingTrust.id, "open");
+          return afterTrust("open", pendingTrust);
+        } catch (e) {
+          return void speakThenListen(messageOf(e));
+        }
+      }
+      if (level === "hint") {
+        userSaid();
+        voiceMode.current = false; // approving the words is a tap, so the mic waits
+        setHintRequest((n) => n + 1);
+        return void voice.say("Drafting a hint now. Check the words on screen, then tap Approve this hint.");
+      }
+      return void speakThenListen("Sorry, was that off the table, a hint, or open?");
+    }
+    const offer = pendingConfirm.current;
+    const answer = offer ? parseConfirm(heard) : null;
+    if (offer && answer) {
+      pendingConfirm.current = null;
+      const item = itemsRef.current?.find((x) => x.key === offer.key);
+      const index = item?.actions?.indexOf(offer.action) ?? -1;
+      userSaid();
+      if (!item || index < 0) return void speakThenListen("That one's already taken care of. What else?");
+      if (answer === "yes") {
+        const ok = await confirm(item, offer.action, index);
+        return void speakThenListen(ok ? `Done! ${ok}` : "Hmm, that didn't work. Check the screen.");
+      }
+      dismiss(item, index);
+      return void speakThenListen("No problem. What else?");
+    }
+    await send(heard, true);
+  }
+  handleSpokenRef.current = handleSpoken;
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (listening) recognizer.current?.stop();
+    voice.unlock();
+    if (voice.isListening()) voice.cancelListening();
     void send(text);
   }
+
+  function onTalk() {
+    if (sendingRef.current) return;
+    voice.unlock(); // inside the tap, so Buddy's reply is allowed to play (iOS)
+    if (voice.isListening()) return voice.finishListening();
+    voiceMode.current = true;
+    void voiceTurnRef.current();
+  }
+
+  /** Stop and Cancel remove the region holding the focused button: hand focus back to Talk. */
+  const refocusTalk = () => requestAnimationFrame(() => talkRef.current?.focus());
 
   return (
     <div className="flex flex-col">
@@ -238,9 +401,19 @@ export function BuddyScreen() {
         subtitle={`Your private helper. Only you see this chat. ${partnerName}'s Buddy knows only what ${partnerName} chooses to share.`}
         back={{ href: "/us/", label: "Us" }}
         action={
-          <Link href="/us/buddy/sharing/" className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold text-accent-text">
-            Sharing
-          </Link>
+          <span className="flex gap-2">
+            <button
+              type="button"
+              aria-expanded={showVoice}
+              onClick={() => setShowVoice((v) => !v)}
+              className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold text-accent-text"
+            >
+              {voice.prefs.speak ? "🔊 Voice" : "🔇 Voice"}
+            </button>
+            <Link href="/us/buddy/sharing/" className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm font-semibold text-accent-text">
+              Sharing
+            </Link>
+          </span>
         }
       />
 
@@ -248,11 +421,11 @@ export function BuddyScreen() {
         <Card className="mb-4 border-accent">
           <p className="text-lg font-bold text-ink">Turn on AI replies for your Buddy?</p>
           <p className="mt-1 text-sm text-ink">
-            With AI on, what you tell Buddy, your own answers and plans, and anything {partnerName} chose to share are sent to Claude (Anthropic's AI) so it can understand you and reply. {partnerName}'s off-the-table answers never are. With AI off, Buddy uses Spark's built-in guide and nothing leaves Spark.
+            With AI on, what you tell Buddy, your own answers and plans, and anything {partnerName} chose to share are sent to Claude (Anthropic's AI) so it can understand you and reply. {partnerName}'s off-the-table answers never are. Buddy's studio voice is made by ElevenLabs, which receives the words Buddy says out loud (they can include things you told Buddy and what {partnerName} chose to share). With AI off, Buddy uses Spark's built-in guide and Spark sends nothing to AI or ElevenLabs.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button onClick={() => ai.set(true)}>Turn on AI</Button>
-            <Button variant="secondary" onClick={() => ai.set(false)}>
+            <Button onClick={() => setAi(true)}>Turn on AI</Button>
+            <Button variant="secondary" onClick={() => setAi(false)}>
               Keep AI off
             </Button>
           </div>
@@ -261,11 +434,12 @@ export function BuddyScreen() {
       {live && ai.consent !== null ? (
         <p className="mb-3 text-sm text-muted">
           AI replies are {ai.aiOn ? "on" : "off"}.{" "}
-          <button type="button" className="min-h-11 font-semibold text-accent-text underline" onClick={() => ai.set(!ai.aiOn)}>
+          <button type="button" className="min-h-11 font-semibold text-accent-text underline" onClick={() => setAi(!ai.aiOn)}>
             Turn {ai.aiOn ? "off" : "on"}
           </button>
         </p>
       ) : null}
+      {showVoice ? <VoicePanel voice={voice} premium={!!serverVoice} onClose={() => setShowVoice(false)} /> : null}
       {notice ? <Notice className="mb-3">{notice}</Notice> : null}
       {loadError ? <Notice tone="danger" title={loadError} /> : null}
       {!items && !loadError ? (
@@ -275,7 +449,7 @@ export function BuddyScreen() {
       ) : null}
 
       {items ? (
-        <ol className="space-y-3" aria-label="Conversation with Spark Buddy" aria-live="polite">
+        <ol className="space-y-3" aria-label="Conversation with Spark Buddy" aria-live={spokenAloud ? "off" : "polite"}>
           {items.length === 0 ? (
             <li>
               <Card className="bg-accent-soft">
@@ -329,12 +503,14 @@ export function BuddyScreen() {
 
       {interviewing && trustFor ? (
         <TrustCard
+          key={trustFor.id}
           question={trustFor}
           partnerName={partnerName}
           aiOn={live && ai.aiOn}
+          hintRequest={hintRequest}
           onDone={(level) => {
             if (level !== "private") toast.show(level === "hint" ? "Hint approved." : "Shared openly.");
-            setTrustFor(null);
+            afterTrust(level, trustFor);
           }}
         />
       ) : null}
@@ -393,7 +569,7 @@ export function BuddyScreen() {
       {items && items.length < 2 && !interviewing ? (
         <div className="mt-4 flex flex-wrap gap-2" aria-label="Try asking">
           {STARTERS.map((s) => (
-            <button key={s} type="button" disabled={sending} onClick={() => void send(s)} className="min-h-11 rounded-full border border-line bg-surface px-4 text-sm font-semibold text-accent-text hover:bg-surface-2">
+            <button key={s} type="button" disabled={sending} onClick={() => { voice.unlock(); void send(s); }} className="min-h-11 rounded-full border border-line bg-surface px-4 text-sm font-semibold text-accent-text hover:bg-surface-2">
               {s}
             </button>
           ))}
@@ -404,6 +580,56 @@ export function BuddyScreen() {
 
       <form onSubmit={onSubmit} className="sticky bottom-0 mt-4 border-t border-line bg-bg/95 pb-4 pt-3 backdrop-blur">
         {sendError ? <Notice tone="danger" className="mb-2" title={sendError} /> : null}
+        {voiceError ? <Notice tone="danger" className="mb-2" title={voiceError} /> : null}
+        {voiceHint ? <Notice className="mb-2">{voiceHint}</Notice> : null}
+        <p className="sr-only" role="status">
+          {voice.listening ? "Listening" : announce}
+        </p>
+        {voice.listening ? (
+          // Visual only for the live transcript: a screen reader reading it back would talk into the open mic.
+          <div className="mb-3 rounded-2xl border border-accent bg-accent-soft px-4 py-3">
+            <p className="flex items-center gap-2 font-semibold text-ink">
+              <span aria-hidden className="inline-block h-3 w-3 animate-pulse rounded-full bg-accent" /> Listening…
+              {voice.countdown !== null ? (
+                <span aria-hidden className="text-sm font-normal text-muted">
+                  sending in {voice.countdown}s
+                </span>
+              ) : null}
+            </p>
+            <p className="mt-1 text-ink" aria-live="off">
+              {voice.heard ? <>I heard: “{voice.heard}”</> : "Go ahead, I'm all ears."}
+            </p>
+            <button
+              type="button"
+              className="mt-1 min-h-11 text-sm font-semibold text-accent-text underline"
+              onClick={() => {
+                voiceMode.current = false;
+                voice.cancelListening();
+                refocusTalk();
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : null}
+        {voice.speaking ? (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-2">
+            <span className="flex items-center gap-2 font-semibold text-accent-text">
+              <span aria-hidden className="buddy-talking flex items-end gap-0.5">
+                <span /> <span /> <span /> <span />
+              </span>
+              Buddy is talking
+            </span>
+            <button type="button" className="min-h-11 rounded-full border border-line px-4 text-sm font-semibold text-ink" onClick={() => {
+                voiceMode.current = false;
+                voice.hush();
+                refocusTalk();
+              }}
+            >
+              ■ Stop
+            </button>
+          </div>
+        ) : null}
         <TextAreaField
           label={question ? "Your answer" : `Talk to your Buddy`}
           value={text}
@@ -417,13 +643,17 @@ export function BuddyScreen() {
           <Button type="submit" loading={sending} disabled={!text.trim()}>
             Send
           </Button>
-          {canSpeak ? (
-            <Button variant="secondary" aria-pressed={listening} onClick={toggleMic}>
-              {listening ? "■ Stop" : "🎙 Talk"}
+          {voice.canListen ? (
+            <Button ref={talkRef} variant="secondary" aria-pressed={voice.listening} onClick={onTalk} aria-disabled={sending || undefined}>
+              {voice.listening ? "✓ Done talking" : "🎙 Talk"}
             </Button>
           ) : null}
           {!interviewing ? (
-            <Button variant="ghost" onClick={startInterview}>
+            <Button variant="ghost" onClick={() => {
+                voice.unlock();
+                voiceMode.current = false;
+                void voice.say(startInterview("Let's do this!"));
+              }}>
               Fill out my onboarding
             </Button>
           ) : null}
@@ -450,11 +680,20 @@ export function BuddyScreen() {
 }
 
 /** "Do you trust this to your Spark Buddy?" after each interview answer. */
-function TrustCard({ question, partnerName, aiOn, onDone }: { question: Question; partnerName: string; aiOn: boolean; onDone(level: ShareLevel): void }) {
+function TrustCard({
+  question, partnerName, aiOn, hintRequest, onDone,
+}: { question: Question; partnerName: string; aiOn: boolean; hintRequest: number; onDone(level: ShareLevel): void }) {
   const { backend } = useApp();
   const [hint, setHint] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const firstRequest = useRef(hintRequest);
+
+  // Saying "hint" out loud drafts it here, exactly like tapping Hint only.
+  useEffect(() => {
+    if (hintRequest !== firstRequest.current && hint === null && !busy) void choose("hint");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hintRequest]);
 
   async function choose(level: ShareLevel) {
     setError(null);

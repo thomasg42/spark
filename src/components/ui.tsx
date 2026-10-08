@@ -4,7 +4,7 @@
  * labels wired to inputs, and errors announced to screen readers.
  */
 import Link from "next/link";
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ButtonHTMLAttributes, type ReactNode, type Ref } from "react";
 import { LAST_TAB_KEY, resolveBack } from "@/lib/ui/last-tab";
 
 import { cx } from "@/lib/ui/cx";
@@ -28,7 +28,7 @@ export function Button({
   disabled,
   type = "button",
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; loading?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; loading?: boolean; ref?: Ref<HTMLButtonElement> }) {
   return (
     <button type={type} className={cx(base, VARIANTS[variant], className)} disabled={disabled || loading} aria-busy={loading || undefined} {...rest}>
       {loading ? <Spinner small /> : null}

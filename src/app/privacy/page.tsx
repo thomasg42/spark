@@ -4,7 +4,7 @@ export const metadata = { title: "What's private" };
 
 const ROWS = [
   { what: "Your onboarding answers", who: "Only you, unless you choose to share one through Spark Buddy.", how: "Encrypted before they're saved. Every answer starts off the table." },
-  { what: "What you let Spark Buddy share", who: "Your partner's Buddy, and only the items you marked Hint (your approved words) or Open.", how: "Encrypted. Change or stop sharing any item at any time." },
+  { what: "What you let Spark Buddy share", who: "Your partner's Buddy, and only the items you marked Hint (your approved words) or Open. If your partner turned on AI, their Buddy may send them to Claude, and read them aloud with the studio voice (ElevenLabs).", how: "Encrypted. Change or stop sharing any item at any time." },
   { what: "Your chat with Spark Buddy", who: "Only you. Your partner can't see it, and their Buddy can't either.", how: "Encrypted before it's saved. Clear it any time." },
   { what: "Projects, the shared calendar, joint savings goals", who: "The two of you.", how: "Either of you can add or update them." },
   { what: "Your own savings goals", who: "Only you, unless you turn on “Let my partner see this” (they still can't change it).", how: "Spark never connects to your bank." },
@@ -42,7 +42,9 @@ export default function PrivacyPage() {
             <li>Date ideas: your city and the titles, categories and ratings of past activities are sent to Claude to suggest new ideas.</li>
             <li>Monthly check-in summary: after you both submit, both sets of check-in answers are sent to Claude for a short, kind summary of overlaps and gaps.</li>
             <li>Spark Buddy: AI is off until you turn it on. When it's on, what you tell your Buddy, your own answers and plans, and the items your partner chose to share are sent to Claude so it can reply. Your partner's off-the-table answers never are.</li>
-            <li>With AI off (the default), your private onboarding answers are never sent to AI.</li>
+            <li>Buddy's studio voice: when AI is on, the words Buddy says out loud are sent to ElevenLabs (a voice service) to turn them into speech. Those words can include things you told Buddy and hints or answers your partner chose to share, and ElevenLabs may keep that text under its own policy. Your voice is never sent there. Nothing is sent when AI is off or when you choose voices that stay on your device.</li>
+            <li>With AI off (the default), your private onboarding answers are never sent to AI, and Buddy talks with your browser's own voice (see the next point).</li>
+            <li>Talking to Buddy uses your browser's own speech features. Some browsers, like Chrome and Edge, process speech on Google's or Microsoft's servers. In Buddy's voice settings you can choose voices that stay on your device. Spark never records or stores your voice.</li>
           </ul>
         </Card>
         <Card>

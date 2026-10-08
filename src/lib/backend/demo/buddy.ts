@@ -107,6 +107,11 @@ export const buddy: Backend["buddy"] = {
     return { hint: fallbackHint(questionId, value), source: "fallback" as const };
   },
 
+  /** The demo has no server: Buddy talks with this device's own voice. */
+  async speak() {
+    return { audio: null, reason: "off" as const };
+  },
+
   async clear() {
     await tick(60);
     const uid = me();

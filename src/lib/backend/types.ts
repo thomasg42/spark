@@ -269,6 +269,15 @@ export interface BuddySendInput {
   aiConsent: boolean;
 }
 
+/**
+ * Why there is (or isn't) studio audio. "off" (no voice configured) and "limited"
+ * (today's quota used) mean stop asking; the rest are one-offs worth retrying.
+ */
+export interface StudioVoiceResult {
+  audio: Blob | null;
+  reason: "off" | "consent" | "limited" | "crisis" | "failed" | null;
+}
+
 export interface BuddySendResult {
   reply: BuddyReply;
   /** Plain-language note when Buddy used its built-in guide instead of Claude. */
@@ -391,6 +400,12 @@ export interface Backend {
     /** With aiConsent, Claude drafts the hint; otherwise Spark's built-in wording. */
     draftHint(questionId: string, aiConsent?: boolean): Promise<{ hint: string; source: "claude" | "fallback" }>;
     clear(): Promise<void>;
+    /**
+     * Buddy's studio voice: renders a short piece of Buddy's reply as audio on the
+     * server. Only with AI consent; resolves null when no voice is configured (or
+     * in the demo), and the app then uses the device's own voice.
+     */
+    speak(text: string, aiConsent: boolean, mood?: "lively" | "calm"): Promise<StudioVoiceResult>;
   };
 
   datePlans: {

@@ -26,6 +26,7 @@ class World {
   messages: Array<MessageRow & { user_id: string }> = [];
   answers = new Map<string, { ciphertext: string | null; skipped: boolean }>();
   clock = 0;
+  voiceUsed = new Map<string, number>();
 
   async seedAnswer(userId: string, questionId: string, value: unknown) {
     this.answers.set(`${userId}|${questionId}`, { ciphertext: await sealer.encryptJson(value, scopes.user(userId), aad.privateAnswer(userId, questionId)), skipped: false });
@@ -56,6 +57,10 @@ class World {
         this.messages = this.messages.filter((m) => m.user_id !== userId);
       },
       userMessagesSince: async () => this.messages.filter((m) => m.user_id === userId && m.role === "user").length,
+      chargeVoice: async (chars) => {
+        this.voiceUsed.set(userId, (this.voiceUsed.get(userId) ?? 0) + chars);
+        return this.voiceUsed.get(userId)!;
+      },
     };
   }
 }

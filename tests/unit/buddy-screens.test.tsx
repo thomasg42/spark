@@ -69,6 +69,174 @@ describe("Spark Buddy screen", () => {
   });
 });
 
+describe("talking with Buddy out loud", () => {
+  type Rec = { onresult: ((e: unknown) => void) | null; onend: (() => void) | null; onerror: ((e: unknown) => void) | null; start(): void; stop(): void };
+  let recs: Rec[] = [];
+  let spoken: string[] = [];
+  let holdSpeech = false;
+  let held: Array<() => void> = [];
+
+  beforeEach(() => {
+    recs = [];
+    spoken = [];
+    holdSpeech = false;
+    held = [];
+    class FakeRec {
+      lang = "";
+      interimResults = false;
+      continuous = false;
+      maxAlternatives = 1;
+      onresult: Rec["onresult"] = null;
+      onend: Rec["onend"] = null;
+      onerror: Rec["onerror"] = null;
+      constructor() {
+        recs.push(this as unknown as Rec);
+      }
+      start() {}
+      stop() {}
+    }
+    class FakeUtterance {
+      text: string;
+      rate = 1;
+      pitch = 1;
+      volume = 1;
+      lang = "";
+      voice: unknown = null;
+      onend: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(t: string) {
+        this.text = t;
+      }
+    }
+    Object.assign(window, {
+      webkitSpeechRecognition: FakeRec,
+      SpeechSynthesisUtterance: FakeUtterance,
+      speechSynthesis: {
+        getVoices: () => [{ name: "Samantha", lang: "en-US", voiceURI: "Samantha", localService: true, default: true }],
+        speak: (u: FakeUtterance) => {
+          if (u.text.trim()) spoken.push(u.text);
+          if (holdSpeech && u.text.trim()) held.push(() => u.onend?.());
+          else queueMicrotask(() => u.onend?.());
+        },
+        cancel: () => {
+          while (held.length) held.shift()!(); // cancel ends whatever is speaking
+        },
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      },
+    });
+    HTMLMediaElement.prototype.play = () => Promise.resolve();
+    HTMLMediaElement.prototype.pause = () => undefined;
+  });
+  afterEach(() => {
+    const w = window as unknown as Record<string, unknown>;
+    delete w.webkitSpeechRecognition;
+    delete w.speechSynthesis;
+    delete w.SpeechSynthesisUtterance;
+  });
+
+  it("listens, shows what it heard, sends, and says the reply out loud", async () => {
+    renderApp(<BuddyPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "🎙 Talk" }));
+    expect(await screen.findByText("Listening…")).toBeTruthy();
+    recs[0]!.onresult!({ resultIndex: 0, results: { length: 1, 0: { isFinal: false, 0: { transcript: "plan a date night for us" } } } });
+    expect(await screen.findByText(/I heard: “plan a date night for us”/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "✓ Done talking" }));
+    expect(await screen.findByRole("button", { name: "Add it" }, { timeout: 4000 })).toBeTruthy();
+    await waitFor(() => expect(spoken.join(" ")).toMatch(/How about/));
+    expect(spoken.join(" ")).toMatch(/Just say yes/);
+  });
+
+  it("lets you say yes to Buddy's suggestion", async () => {
+    renderApp(<BuddyPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Plan a date night for us" }));
+    await screen.findByRole("button", { name: "Add it" }, { timeout: 4000 });
+    fireEvent.click(screen.getByRole("button", { name: "🎙 Talk" }));
+    await screen.findByText("Listening…");
+    recs.at(-1)!.onresult!({ resultIndex: 0, results: { length: 1, 0: { isFinal: true, 0: { transcript: "yeah add it" } } } });
+    fireEvent.click(screen.getByRole("button", { name: "✓ Done talking" }));
+    await waitFor(() => expect(demoStore.get().datePlans).toHaveLength(1), { timeout: 4000 });
+    await waitFor(() => expect(spoken.join(" ")).toMatch(/Done!/));
+  });
+
+  const heardWords = async (words: string) => {
+    const rec = recs.at(-1)!;
+    rec.onresult!({ resultIndex: 0, results: { length: 1, 0: { isFinal: true, 0: { transcript: words } } } });
+    fireEvent.click(await screen.findByRole("button", { name: "✓ Done talking" }));
+  };
+
+  it("hands-free: 'off the table' keeps the earlier answer private even when the next answer says 'open'", async () => {
+    localStorage.setItem(`spark-buddy-voice:${DEMO_ALEX}`, JSON.stringify({ speak: true, handsFree: true, voiceURI: null, energy: 1.1, onDeviceOnly: false }));
+    demoStore.update((s) => {
+      for (const id of ["siblings", "birth_order"]) {
+        s.answers[DEMO_ALEX]!.push({ questionId: id, section: "roots", value: id === "siblings" ? "one" : "oldest", skipped: false, updatedAt: new Date().toISOString() });
+      }
+    });
+    renderApp(<BuddyPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Fill out my onboarding" }));
+    await screen.findByText("Who raised you, mostly?");
+    fireEvent.click(screen.getByRole("button", { name: "🎙 Talk" }));
+    await heardWords("my single mom raised me");
+    await screen.findByText("Do you trust this to your Spark Buddy?", {}, { timeout: 4000 });
+    // Hands-free re-opens the mic for the trust answer.
+    await waitFor(() => expect(screen.getByRole("button", { name: "✓ Done talking" })).toBeTruthy(), { timeout: 4000 });
+    await heardWords("off the table");
+    await screen.findByText("Where did you grow up?", {}, { timeout: 4000 });
+    await waitFor(() => expect(screen.getByRole("button", { name: "✓ Done talking" })).toBeTruthy(), { timeout: 4000 });
+    await heardWords("I'd want him to be more open with me");
+    await waitFor(() => expect(demoStore.get().answers[DEMO_ALEX]!.find((a) => a.questionId === "hometown")?.value).toBe("I'd want him to be more open with me"), { timeout: 4000 });
+    expect(demoStore.get().answers[DEMO_ALEX]!.find((a) => a.questionId === "raised_by")?.value).toBe("single_parent");
+    expect(demoStore.get().buddyShares[DEMO_ALEX] ?? []).toEqual([]); // nothing shared, least of all the first answer
+  });
+
+  it("a spoken yes only confirms the suggestion Buddy just offered", async () => {
+    renderApp(<BuddyPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Plan a date night for us" }));
+    await screen.findByRole("button", { name: "Add it" }, { timeout: 4000 }); // an older offer, left untouched
+    fireEvent.change(screen.getByLabelText("Talk to your Buddy"), { target: { value: "Add a project: paint the nursery" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Add it" })).toHaveLength(2), { timeout: 4000 });
+    fireEvent.click(screen.getByRole("button", { name: "🎙 Talk" }));
+    await heardWords("yes");
+    await waitFor(() => expect(demoStore.get().projects.some((p) => p.title === "Paint the nursery")).toBe(true), { timeout: 4000 });
+    expect(demoStore.get().datePlans).toHaveLength(0);
+  });
+
+  it("Esc while Buddy talks hands-free stops everything and never opens the mic", async () => {
+    localStorage.setItem(`spark-buddy-voice:${DEMO_ALEX}`, JSON.stringify({ speak: true, handsFree: true, voiceURI: null, energy: 1.1, onDeviceOnly: false }));
+    renderApp(<BuddyPage />);
+    await screen.findByRole("button", { name: "🎙 Talk" });
+    holdSpeech = true;
+    fireEvent.click(screen.getByRole("button", { name: "🎙 Talk" }));
+    await heardWords("plan a date night");
+    await waitFor(() => expect(held.length).toBeGreaterThan(0), { timeout: 4000 }); // Buddy is mid-reply
+    const before = recs.length;
+    fireEvent.keyDown(document, { key: "Escape" });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(recs.length).toBe(before);
+    expect(screen.queryByText("Listening…")).toBeNull();
+  });
+
+  it("cancelling a listening turn is not an error", async () => {
+    renderApp(<BuddyPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "🎙 Talk" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText(/didn't catch that/)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("has voice settings with talking back on and a lively default", async () => {
+    renderApp(<BuddyPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "🔊 Voice" }));
+    expect((screen.getByLabelText("Buddy talks back out loud") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText(/Hands-free/) as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByText("Buddy's pick (the liveliest on this device)")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "▶ Hear Buddy" }));
+    await waitFor(() => expect(spoken.join(" ")).toMatch(/Spark Buddy/));
+  });
+});
+
 describe("sharing screen", () => {
   it("lists your answers with their share level, off the table by default", async () => {
     demoStore.update((s) => {

@@ -56,6 +56,10 @@ export const MESSAGE_MAX = 2000;
 export const REPLY_MAX = 1500;
 export const MAX_ACTIONS = 4;
 export const MAX_USER_MESSAGES_PER_DAY = 150;
+/** Longest piece of text the studio voice renders in one request. */
+export const SPEAK_CHUNK_MAX = 600;
+/** Studio-voice characters per person per day (cost guard). */
+export const MAX_SPEAK_CHARS_PER_DAY = 40_000;
 
 export function isShareLevel(value: unknown): value is ShareLevel {
   return typeof value === "string" && (SHARE_LEVELS as readonly string[]).includes(value);

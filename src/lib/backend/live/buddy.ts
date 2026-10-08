@@ -1,6 +1,6 @@
-import { isShareLevel, MESSAGE_MAX } from "@shared/buddy.ts";
+import { isShareLevel, MESSAGE_MAX, SPEAK_CHUNK_MAX } from "@shared/buddy.ts";
 import { findQuestion } from "@shared/questionnaires.ts";
-import { UserFacingError, type Backend, type BuddySendResult, type BuddyShare, type BuddyTurn } from "../types";
+import { UserFacingError, type Backend, type BuddySendResult, type BuddyShare, type BuddyTurn, type StudioVoiceResult } from "../types";
 import { invoke, requireUserId } from "./client";
 
 /**
@@ -44,6 +44,26 @@ export const buddy: Backend["buddy"] = {
     knownQuestion(questionId);
     return invoke<{ hint: string; source: "claude" | "fallback" }>("buddy", { action: "draft_hint", questionId, aiConsent: aiConsent === true });
   },
+  async speak(text, aiConsent, mood = "lively") {
+    // The studio voice sends Buddy's words to the voice provider, so it needs the same consent as AI replies.
+    if (!aiConsent) return { audio: null, reason: "consent" };
+    const clean = (text ?? "").trim();
+    if (!clean) return { audio: null, reason: "failed" };
+    try {
+      const { audio, mime, reason } = await invoke<{ audio: string | null; mime?: string; reason?: StudioVoiceResult["reason"] }>("buddy", {
+        action: "speak",
+        text: clean.slice(0, SPEAK_CHUNK_MAX),
+        aiConsent: true,
+        mood,
+      });
+      if (!audio) return { audio: null, reason: reason ?? "failed" };
+      const bytes = Uint8Array.from(atob(audio), (c) => c.charCodeAt(0));
+      return { audio: new Blob([bytes], { type: mime || "audio/mpeg" }), reason: null };
+    } catch {
+      return { audio: null, reason: "failed" }; // any failure falls back to the device voice
+    }
+  },
+
   async clear() {
     await requireUserId();
     await invoke<{ ok: true }>("buddy", { action: "clear" });

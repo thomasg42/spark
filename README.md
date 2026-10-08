@@ -45,6 +45,7 @@ Browser (Next.js static export on GitHub Pages)
 - **AI consent:** Buddy uses Claude only when the person turns AI on (asked once per device; enforced again on the server). With AI off, or with no key, Buddy runs its built-in rule-based guide, so the "never sent to AI" promise stays true by default. Crisis language always goes straight to resources, never to the model.
 - **Projects** (`/plans/projects/`): one shared list ranked 1..N (move up/down, status, budget). **Money** (`/plans/money/`): savings goals, joint (both see and update) or yours (only you, unless you let your partner see it, read-only). Spark never connects to a bank.
 - **Our stars & numbers** (`/us/stars/`): Sun sign, Chinese zodiac, Life Path and Personal Year for both partners, with couple strengths, watch-outs and "keep it from getting old" ideas. Computed deterministically (`_shared/astro.ts`); framed as a lens, not a prediction. Moon and Rising are not computed yet.
+- **Buddy talks back (2026-10-07):** every reply is spoken in a lively voice (on by default; 🔊 Voice settings: talk back, hands-free, voice, energy, on-device-only). Tap 🎙 Talk: Buddy shows "I heard: …" live, sends when you pause (the GMM "own the turn" listener: it rides through the phone's early stop and ends on real silence), speaks the reply, asks interview questions aloud, and accepts spoken "yes, add it" / "off the table". Hands-free keeps listening after each reply until a turn is silent. Two engines: the device's own voice (always; the liveliest English voice is auto-picked, novelty voices excluded) and, in live mode with AI on, a studio voice from ElevenLabs (`eleven_v4`, voice Jade) rendered by the `buddy` Edge Function and metered per person per day (`20261007000500_spark_buddy_voice.sql`). If the studio voice fails mid-reply, the rest continues in the device voice. Code: `src/lib/buddy/voice/`, `src/components/buddy/use-buddy-voice.ts`, `supabase/functions/_shared/voice.ts`.
 - **Migrations:** `20261006000300_spark_buddy.sql` (buddy_shares, buddy_messages, date_plans) and `20261006000400_spark_projects_money.sql` (projects + `move_project`, money_goals). Both are covered by `tests/db/buddy-projects-money.test.ts`.
 
 ## Project layout
@@ -85,6 +86,7 @@ npm run build        # static export into out/
    ```bash
    node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"   # -> ENCRYPTION_KEY
    npx supabase secrets set ENCRYPTION_KEY=<that value> ANTHROPIC_API_KEY=<your key> ALLOWED_ORIGINS=https://<user>.github.io,http://localhost:3000
+   npx supabase secrets set ELEVENLABS_API_KEY=<your key>   # optional: Buddy's studio voice
    npx supabase functions deploy answers
    npx supabase functions deploy checkins
    npx supabase functions deploy date-ideas
