@@ -37,7 +37,7 @@ describe("answer encryption", () => {
     const ct = await sealer.encrypt("private", scopes.couple("c"), "a");
     const parts = ct.split(".");
     const body = parts[2]!;
-    const flipped = body.slice(0, -2) + (body.endsWith("A") ? "B" : "A") + body.slice(-1);
+    const flipped = (body.startsWith("A") ? "B" : "A") + body.slice(1);
     await expect(sealer.decrypt(`${parts[0]}.${parts[1]}.${flipped}`, scopes.couple("c"), "a")).rejects.toThrow();
   });
 

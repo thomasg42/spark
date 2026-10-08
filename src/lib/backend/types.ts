@@ -1,3 +1,4 @@
+import type { SavedConversation, ConversationSummary } from "@shared/buddy-conversations.ts";
 import type {IntimacyApi} from '@shared/intimacy.ts';
 import type { DreamsApi } from "@shared/shared-dreams.ts";
 /**
@@ -308,6 +309,7 @@ export interface MoneyGoalInput {
 }
 
 export interface BuddySendInput {
+  history?: BuddyTurn[];
   text: string;
   /** The onboarding question the interview is asking right now, if any. */
   interviewQuestionId: string | null;
@@ -444,6 +446,9 @@ export interface Backend {
    */
   buddy: {
     history(): Promise<BuddyTurn[]>;
+    conversations(): Promise<ConversationSummary[]>;
+    saveConversation(input: Omit<SavedConversation, "updatedAt">): Promise<SavedConversation>;
+    openConversation(id: string): Promise<SavedConversation>;
     send(input: BuddySendInput): Promise<BuddySendResult>;
     /** The signed-in person's own shares (what their partner's Buddy may see). */
     shares(): Promise<BuddyShare[]>;

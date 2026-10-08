@@ -1,11 +1,2 @@
-"use client";
-import { RequireStage } from "@/components/require-stage";
-import { StoryScreen } from "@/components/story/story-screen";
-
-export default function StoryPage() {
-  return (
-    <RequireStage allow="ready">
-      <StoryScreen />
-    </RequireStage>
-  );
-}
+import {LegacyRoute} from "@/components/legacy-route";
+export default function Page(){return <LegacyRoute href="/our-story/"/>;}

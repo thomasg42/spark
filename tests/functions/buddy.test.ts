@@ -7,7 +7,7 @@
  */
 import { randomBytes } from "node:crypto";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { createBuddyHandler, KEY_MISSING_MESSAGE, RATE_LIMIT_MESSAGE, BUDDY_NOTICES, type BuddyRepo, type MessageRow, type ShareRow } from "@shared/buddy-handler.ts";
+import { createBuddyHandler, KEY_MISSING_MESSAGE, RATE_LIMIT_MESSAGE, BUDDY_NOTICES, type BuddyRepo, type ConversationRow, type MessageRow, type ShareRow } from "@shared/buddy-handler.ts";
 import { MAX_USER_MESSAGES_PER_DAY, type BuddyReply, type BuddyShare } from "@shared/buddy.ts";
 import { aad, createSealer, scopes } from "@shared/crypto.ts";
 import { HttpError, type UserContext } from "@shared/http.ts";
@@ -22,6 +22,8 @@ const SAM_PRIVATE = "My ex cheated on me and I still flinch at late nights.";
 
 /** One shared store, viewed through a repo per user (like RLS would). */
 class World {
+  saved=new Map<string,ConversationRow>();
+  usage=new Map<string,number>();
   shares: ShareRow[] = [];
   messages: Array<MessageRow & { user_id: string }> = [];
   answers = new Map<string, { ciphertext: string | null; skipped: boolean }>();
@@ -35,6 +37,10 @@ class World {
   repoFor(userId: string): BuddyRepo {
     const partner = userId === alex ? sam : alex;
     return {
+      conversations:async()=>[...this.saved.entries()].filter(([key])=>key.startsWith(userId+'|')).map(([,r])=>r),
+      conversation:async(id)=>this.saved.get(userId+'|'+id) ?? null,
+      saveConversation:async(r)=>{this.saved.set(userId+'|'+r.id,{id:r.id,body_ciphertext:r.ciphertext,updated_at:r.updatedAt});},
+      chargeMessage:async()=>{const n=(this.usage.get(userId) ?? 0)+1;this.usage.set(userId,n);return n;},
       couple: async () => ({ coupleId: COUPLE, partnerId: partner }),
       // RLS: own rows, or the partner's hint/open rows.
       shares: async (ownerId) => this.shares.filter((r) => r.user_id === ownerId && (ownerId === userId || (ownerId === partner && (r.level === "hint" || r.level === "open")))),
@@ -206,19 +212,33 @@ describe("talking to Buddy", () => {
     expect(r2.reply.source).toBe("fallback");
   });
 
-  it("stores the conversation encrypted, only for its owner", async () => {
-    await handlerFor(alex)({ action: "send", text: "My secret worry is money", context });
-    expect(JSON.stringify(world.messages)).not.toContain("secret worry");
-    const { turns } = (await handlerFor(alex)({ action: "history" })) as { turns: Array<{ role: string; text: string }> };
-    expect(turns.map((t) => t.role)).toEqual(["user", "buddy"]);
-    expect(turns[0]!.text).toBe("My secret worry is money");
-    expect(((await handlerFor(sam)({ action: "history" })) as { turns: unknown[] }).turns).toEqual([]);
-    await handlerFor(alex)({ action: "clear" });
+  it("keeps unsaved messages ephemeral and saves only on request, encrypted for the owner", async () => {
+    const chat=handlerFor(alex);
+    await chat({action:'send',text:'My secret worry is money',context});
     expect(world.messages).toEqual([]);
+    expect((await chat({action:'history'}) as {turns:unknown[]}).turns).toEqual([]);
+    const id='11111111-1111-4111-8111-111111111111';
+    const turns=[{role:'user',text:'My secret worry is money',at:now.toISOString()}];
+    await chat({action:'save_conversation',id,title:'Private worries',turns});
+    expect(JSON.stringify([...world.saved.values()])).not.toContain('secret worry');
+    expect(JSON.stringify([...world.saved.values()])).not.toContain('Private worries');
+    expect((await chat({action:'open_conversation',id}) as any).conversation.turns[0].text).toBe(turns[0]!.text);
+    await expect(handlerFor(sam)({action:'open_conversation',id})).rejects.toThrow('Conversation not found');
+    expect((await handlerFor(sam)({action:'conversations'}) as any).conversations).toEqual([]);
+  });
+
+  it("sends all earlier turns as model messages and never silently truncates",async()=>{
+    const claude=fakeClaude();
+    const history=Array.from({length:30},(_,i)=>({role:i%2?'buddy':'user',text:i===0?'Our first trip was to Kyoto.':`Turn ${i}`,at:now.toISOString()}));
+    await handlerFor(alex,claude.generate)({action:'send',text:'Where was our first trip?',history,context,aiConsent:true});
+    expect(claude.prompts[0]!.messages?.[1]).toEqual({role:'user',content:'Our first trip was to Kyoto.'});
+    expect(claude.prompts[0]!.messages?.length).toBe(32);
+    expect(world.messages).toEqual([]);
+    await expect(handlerFor(alex)({action:'send',text:'hi',history:Array(601).fill(history[0]),context})).rejects.toThrow(/too long/);
   });
 
   it("rate limits and validates input", async () => {
-    for (let i = 0; i < MAX_USER_MESSAGES_PER_DAY; i++) world.messages.push({ id: `m${i}`, user_id: alex, role: "user", body_ciphertext: "v1.x.y", created_at: now.toISOString() });
+    world.usage.set(alex,MAX_USER_MESSAGES_PER_DAY);
     await expect(handlerFor(alex)({ action: "send", text: "hi", context })).rejects.toThrow(RATE_LIMIT_MESSAGE);
     await expect(handlerFor(sam)({ action: "send", text: "   ", context })).rejects.toThrow(/Say something/);
     await expect(handlerFor(sam)({ action: "send", text: "hi", context, interviewQuestionId: "made_up" })).rejects.toThrow(/doesn't exist/);

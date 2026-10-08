@@ -4,13 +4,23 @@ A private two-person app that helps a couple stay connected for the long term: c
 
 **Phase 1** is in this repo: email sign-in and pairing, profiles with personal themes, Our Story timeline, private onboarding questionnaires, weekly pulse, monthly check-in with hidden-until-both reveal and an AI summary, appreciation notes, activity log with ratings, a Claude-powered date idea generator, cadence negotiation, a social media agreement, and **Moments** (a private feed of clips, photos, links and notes for the two of you). Later phases are in [ROADMAP.md](ROADMAP.md).
 
+## Buddy conversation memory (2026-10-08)
+
+The current conversation stays in document memory across Spark navigation. Closing or fully reloading the app starts fresh; the browser cannot reliably report a phone force-close, so unsaved transcripts never go to localStorage/sessionStorage or server storage. Backgrounding alone does not clear a still-running app. New conversation also starts fresh; sign-out clears session memory.
+
+**Save Conversation** explicitly saves a named snapshot; **Saved conversations** reopens its exact transcript and allows continuation. Save again to keep later messages. Demo saves live in this browser and fail visibly if storage cannot persist. Live saves encrypt title and transcript together in owner-only `buddy_conversations` (migration `20261008001200_spark_buddy_conversations.sql`). Previously stored chats are available as Earlier conversation, never automatically injected into a new chat.
+
+The live model receives all active turns as user/assistant messages, replacing the old 12-turn/800-character window. At 600 turns or 180,000 text characters the app asks for a new conversation instead of dropping early messages; enough space is reserved for a final reply. A separate atomic count-only daily meter replaces message-content storage for rate limiting. Completed actions are recorded in the active transcript; reopening a saved transcript never re-executes them. Other explicit records (onboarding answers, shared plans, approved shares) remain separate.
+
+The demo is still the built-in guide, with earlier-detail recall; this change does not activate Claude. Backend deployment needs migration 1200 plus the updated Buddy function. No real backend or paid model was used for verification.
+
 ## Intimacy and navigation (Module K)
 
 Enable Intimacy independently in **Us → Settings** for each adult profile. `/intimacy/` contains mutual overlaps and private sparks; `/intimacy/comfort/`, `/intimacy/library/`, `/intimacy/coach/` and `/intimacy/reflection/` cover the private map, neutral illustrated library, structured guide and private debrief. No and Not now choices are never shown to the partner. The guide uses `prompts/spark-coach.md` plus `prompts/intimacy-overlay.md`; live AI can select only a known response topic, with no raw generated prose or URLs rendered. It is not unrestricted chat. Demo is fictional Alex/Sam browser data.
 
 Migrations `0900` and `1000` add owner-only Intimacy data, atomic consent/overlap/invite rules, pronouns and encrypted people/gathering cards. Deploy the new `intimacy` function and updated `shared-dreams`. Comfort choices are RLS-protected; private guide/reflection text and family card text are application-encrypted. General Buddy does not receive Intimacy fields. Real backend activation is separate from demo publication.
 
-Plans now holds upcoming choices; Activities has its own tab with logging at the bottom. History opens the existing timeline. Family & Friends includes people, gatherings with calendar export, story moments and off-by-default private health reminders. Existing tabs remain in a horizontally scrollable phone bar. Catalog and drawings are local review content until approved for publication.
+Plans holds upcoming choices; Activities owns the idea finder and activity log, with logging at the bottom. Projects has its own tab with existing projects first and the add form last. Our Story combines how you met, the relationship timeline, family/friend introductions, people cards, gatherings with calendar export and off-by-default private health reminders. Migration `20261008001100_spark_story_friend.sql` adds friend introductions. Old navigation routes redirect to the new homes. Existing tabs remain in a horizontally scrollable phone bar. Catalog and drawings are local review content until approved for publication.
 
 ## Shared Dreams & Support (Module L)
 

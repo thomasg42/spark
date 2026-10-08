@@ -17,10 +17,9 @@ function PlansHub() {
   const { backend, user, nameOf } = useApp();
   const toast = useToast();
   const data = useLoad(async () => {
-    const [projects, money, plans, rules] = await Promise.all([backend.projects.list(), backend.money.list(), backend.datePlans.list(), backend.dateRules.list()]);
-    return { projects, money, plans, rules };
+    const [money, plans, rules] = await Promise.all([backend.money.list(), backend.datePlans.list(), backend.dateRules.list()]);
+    return { money, plans, rules };
   }, [backend, user?.id]);
-  const open = data.data?.projects.filter((p) => p.status !== "done") ?? [];
   const joint = data.data?.money.filter((g) => g.scope === "joint") ?? [];
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = (data.data?.plans ?? []).filter((p) => p.plannedFor >= today).slice(0, 4);
@@ -29,9 +28,6 @@ function PlansHub() {
     <div className="mb-6">
       <DrillList label="Plans">
         <li><DrillRow href="/plans/dreams/" icon="↗" title="Shared Dreams & Support" status="Our future, weekly support, and Life Anchors" /></li>
-        <li>
-          <DrillRow href="/plans/projects/" icon="🔨" title="Projects" status={open.length ? `1. ${open[0]!.title}${open.length > 1 ? ` · ${open.length - 1} more` : ""}` : "What you're working on, in priority order"} />
-        </li>
         <li>
           <DrillRow href="/plans/standing/" icon="◷" title="Standing date night" status={standing ? `${describeRule(standing.rule)}${standing.tonight ? " · tonight" : ""}` : "The same night every week, set once"} />
         </li>
@@ -90,15 +86,16 @@ export function ActivitiesScreen() {
 
   return (
     <>
-      <PageHeader title="Activities" subtitle="Ideas to try, memories to keep." action={<Link href="/plans/ideas/" className="inline-flex min-h-11 items-center rounded-full bg-accent px-4 font-semibold text-accent-ink">Ideas</Link>} />
+      <PageHeader title="Activities" subtitle="Ideas to try, memories to keep." />
+      <div className="mb-5"><DrillList label="Activity ideas"><li><DrillRow href="/activities/ideas/" icon="✦" title="Find an activity idea" status="Choose something to do together"/></li></DrillList></div>
       <div className="mb-5 overflow-x-auto pb-1"><ChoiceGroup legend="Filter activities" options={[{ value: "all", label: "All" }, ...ACTIVITY_CATEGORIES.map((value) => ({ value, label: CATEGORY_COPY[value].label }))]} value={category} onChange={setCategory as (value: string) => void} columns={2} name="activity-filter" /></div>
       {list.error ? <Notice tone="danger" title={list.error} /> : null}
       {rate.error ? <Notice tone="danger" className="mb-3" title={rate.error} /> : null}
-      {list.data && grouped.size === 0 ? <EmptyState emoji="◷" title="No activities yet" body="Log a plan after you do it, then add both ratings when you feel like it." action={<Link href="/plans/ideas/" className="inline-flex min-h-11 items-center font-semibold text-accent-text">Find an idea</Link>} /> : null}
+      {list.data && grouped.size === 0 ? <EmptyState emoji="◷" title="No activities yet" body="Log a plan after you do it, then add both ratings when you feel like it." /> : null}
       <div className="space-y-7">{[...grouped.entries()].map(([month, activities]) => <section key={month} aria-labelledby={`month-${month}`}><h2 id={`month-${month}`} className="mb-3 text-xl font-bold text-ink">{new Date(`${month}-01T12:00:00`).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h2><div className="space-y-3">{activities.map((activity) => <Card key={activity.id} as="article"><div className="flex items-start justify-between gap-3"><div><p className="text-sm text-muted">{formatDate(activity.happenedOn)}</p><h3 className="mt-1 text-lg font-bold text-ink">{activity.title}</h3></div><Badge>{CATEGORY_COPY[activity.category].emoji} {CATEGORY_COPY[activity.category].label}</Badge></div>{activity.note ? <p className="mt-3 whitespace-pre-wrap text-sm text-muted">{activity.note}</p> : null}<Rating activity={activity} mine={user ? activity.ratings[user.id] : undefined} userId={user?.id} partnerName={partnerName} pending={rate.pending} onRate={async (value) => { const result = await rate.run(activity.id, value); if (result) toast.show("Rating saved."); }} /></Card>)}</div></section>)}</div>
-      <Link href="/plans/new/" className="mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent px-5 font-semibold text-accent-ink">Log an activity</Link>
+      <Link href="/activities/new/" className="mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent px-5 font-semibold text-accent-ink">Log an activity</Link>
     </>
   );
 }
 
-export function PlansScreen(){return <><PageHeader title="Plans" subtitle="Choose something to look forward to, then make room for it."/><DrillList label="Ideas & activities"><li><DrillRow href="/plans/ideas/" icon="✦" title="Find an activity idea" status="Browse and generate ideas, then plan a date"/></li><li><DrillRow href="/activities/" icon="♡" title="Activities" status="Things you’ve tried, ratings, and your activity log"/></li><li><DrillRow href="/people/" icon="♧" title="Family & Friends" status="People, gatherings and story moments"/></li></DrillList><div className="mt-5"><PlansHub/></div></>;}
+export function PlansScreen(){return <><PageHeader title="Plans" subtitle="Your upcoming time together, standing dates and shared goals."/><PlansHub/></>;}

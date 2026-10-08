@@ -115,14 +115,14 @@ describe("Rhythm Breaker cards", () => {
 
   it("turns 'same kinds of dates for three weeks' into a specific next step", () => {
     const cards = rhythmCards({ activities: sameOld, pulses: [], lifeChanges: [], rules: [], today });
-    expect(cards).toEqual([{ id: "category_rut", message: expect.stringMatching(/same couple of plans for 3 weeks/), actions: [{ label: "Find a new kind of date", href: "/plans/ideas/" }] }]);
+    expect(cards).toEqual([{ id: "category_rut", message: expect.stringMatching(/same couple of plans for 3 weeks/), actions: [{ label: "Find a new kind of date", href: "/activities/ideas/" }] }]);
   });
 
   it("suggests a standing date night only to couples who don't have one", () => {
     const lonely = [activity("2026-09-01", "food")];
     expect(rhythmCards({ activities: lonely, pulses: [], lifeChanges: [], rules: [], today })[0]!.actions[0]).toEqual({ label: "Set a standing date night", href: "/plans/standing/" });
     const withRule = rhythmCards({ activities: lonely, pulses: [], lifeChanges: [], rules: [rule()], today });
-    expect(withRule[0]!.actions.map((a) => a.href)).toEqual(["/plans/ideas/"]);
+    expect(withRule[0]!.actions.map((a) => a.href)).toEqual(["/activities/ideas/"]);
   });
 
   it("notices excitement dipping two weeks running without naming anyone", () => {

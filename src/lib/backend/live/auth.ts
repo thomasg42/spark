@@ -1,3 +1,4 @@
+import { clearBuddySessions } from "@/lib/buddy/session";
 import { appUrl } from "@/lib/config";
 import { UserFacingError, type Backend, type SessionUser } from "../types";
 import { resetCoupleCache, supabase } from "./client";
@@ -49,6 +50,7 @@ export const auth: Backend["auth"] = {
     return toUser(data.session?.user);
   },
   async signOut() {
+    clearBuddySessions();
     resetCoupleCache();
     await supabase().auth.signOut();
   },

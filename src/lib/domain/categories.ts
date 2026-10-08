@@ -16,7 +16,7 @@ export function isActivityCategory(value: unknown): value is ActivityCategory {
 }
 
 export const STORY_KINDS = [
-  "how_we_met", "together", "first_date", "first_kiss", "met_family", "trip", "milestone", "anniversary", "other",
+  "how_we_met", "together", "first_date", "first_kiss", "met_family", "met_friend", "trip", "milestone", "anniversary", "other",
 ] as const;
 export type StoryKind = (typeof STORY_KINDS)[number];
 
@@ -25,7 +25,8 @@ export const STORY_KIND_COPY: Record<StoryKind, { label: string; emoji: string; 
   together: { label: "Officially together", emoji: "💞", prompt: "The day you decided. How did it happen?" },
   first_date: { label: "First date", emoji: "🍽️", prompt: "Where did you go? What almost went wrong?" },
   first_kiss: { label: "First kiss", emoji: "💋", prompt: "Only as much detail as you both want here." },
-  met_family: { label: "Met the family", emoji: "🏡", prompt: "Whose family, and how did it go?" },
+  met_family: { label: "Met a family member", emoji: "🏡", prompt: "Who did you meet, how were you introduced, and what do you remember?" },
+  met_friend: { label: "Met a friend", emoji: "♧", prompt: "Whose friend did you meet? Tell the story of that first introduction." },
   trip: { label: "Trip", emoji: "🧳", prompt: "Where to, and the moment you'd relive?" },
   milestone: { label: "Milestone", emoji: "🏁", prompt: "Moved in, new pet, big win…" },
   anniversary: { label: "Anniversary", emoji: "🎂", prompt: "A date worth celebrating every year." },

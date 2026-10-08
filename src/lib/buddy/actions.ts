@@ -14,9 +14,9 @@ export const NAV_HREF: Record<Extract<BuddyAction, { type: "open" }>["to"], { hr
   sharing: { href: "/us/buddy/sharing/", label: "What Buddy may share" },
   stars: { href: "/us/stars/", label: "Our stars & numbers" },
   questions: { href: "/us/questions/", label: "Questions" },
-  ideas: { href: "/plans/ideas/", label: "Date ideas" },
+  ideas: { href: "/activities/ideas/", label: "Date ideas" },
   checkin: { href: "/checkin/", label: "Check-in" },
-  projects: { href: "/plans/projects/", label: "Projects" },
+  projects: { href: "/projects/", label: "Projects" },
   money: { href: "/plans/money/", label: "Money" },
 };
 

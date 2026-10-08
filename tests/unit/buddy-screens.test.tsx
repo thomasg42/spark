@@ -12,7 +12,7 @@ import { PageHeader, ToastProvider } from "@/components/ui";
 import BuddyPage from "@/app/us/buddy/page";
 import BuddySharingPage from "@/app/us/buddy/sharing/page";
 import StarsPage from "@/app/us/stars/page";
-import ProjectsPage from "@/app/plans/projects/page";
+import ProjectsPage from "@/app/projects/page";
 import MoneyPage from "@/app/plans/money/page";
 import { DEMO_ALEX, DEMO_SAM, demoStore } from "@/lib/backend/demo/store";
 
@@ -40,6 +40,27 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("Spark Buddy screen", () => {
+  it("saves, starts fresh, reopens and continues the same private conversation", async()=>{
+    const view=renderApp(<BuddyPage />);
+    const send=async(text:string)=>{const box=await screen.findByLabelText("Talk to your Buddy");fireEvent.change(box,{target:{value:text}});fireEvent.click(within(box.closest('form')!).getByRole('button',{name:'Send'}));await waitFor(()=>expect(screen.getByRole('button',{name:'Save Conversation'}).hasAttribute('disabled')).toBe(false),{timeout:4000});};
+    await send('Our first trip was Kyoto.');
+    fireEvent.change(screen.getByLabelText('Conversation name (optional)'),{target:{value:'Our trip chat'}});
+    fireEvent.click(screen.getByRole('button',{name:'Save Conversation'}));
+    await screen.findByText('Conversation saved. Save again to keep later messages.');
+    fireEvent.click(screen.getByRole('button',{name:'New conversation'}));
+    fireEvent.click(screen.getByRole('button',{name:'Start fresh'}));
+    await waitFor(()=>expect(screen.queryByText('Our first trip was Kyoto.')).toBeNull());
+    fireEvent.click(screen.getByRole('button',{name:'Saved conversations'}));
+    fireEvent.click(await screen.findByRole('button',{name:/Our trip chat/}));
+    fireEvent.click(screen.getByRole('button',{name:'Open conversation'}));
+    await screen.findByText('Our first trip was Kyoto.');
+    await send('Do you remember our first trip?');
+    expect(await screen.findByText(/Earlier in this conversation you said:.*Kyoto/)).toBeTruthy();
+    view.unmount();renderApp(<BuddyPage />);
+    expect(await screen.findByText('Our first trip was Kyoto.')).toBeTruthy();
+    expect((screen.getByLabelText('Conversation name (optional)') as HTMLInputElement).value).toBe('Our trip chat');
+  });
+
   it("interviews you, fills in the answer from what you say, then asks what Buddy may share", async () => {
     renderApp(<BuddyPage />);
     fireEvent.click(await screen.findByRole("button", { name: "Fill out my onboarding" }));

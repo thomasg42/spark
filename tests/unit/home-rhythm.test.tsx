@@ -33,7 +33,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 const renderApp = (view: ReactNode) => render(<AppProvider><ToastProvider>{view}</ToastProvider></AppProvider>);
-const TAB_ROOTS = ["/home/", "/moments/", "/checkin/", "/plans/", "/us/"];
+const TAB_ROOTS = ["/home/", "/moments/", "/checkin/", "/plans/", "/activities/", "/projects/", "/our-story/", "/intimacy/", "/us/"];
 
 beforeEach(() => {
   pathname = "/home/";
@@ -58,9 +58,9 @@ describe("favorites and drill-down helpers", () => {
   it("parses stored lists safely and keeps catalog order when toggling", () => {
     expect(parseFavorites(null)).toEqual(DEFAULT_FAVORITES);
     expect(parseFavorites("not json")).toEqual(DEFAULT_FAVORITES);
-    expect(parseFavorites('["story","bogus","story"]')).toEqual(["story"]);
-    expect(toggleFavorite(["story"], "ideas")).toEqual(["ideas", "story"]);
-    expect(toggleFavorite(["ideas", "story"], "ideas")).toEqual(["story"]);
+    expect(parseFavorites('["notes","bogus","notes"]')).toEqual(["notes"]);
+    expect(toggleFavorite(["notes"], "ideas")).toEqual(["ideas", "notes"]);
+    expect(toggleFavorite(["ideas", "notes"], "ideas")).toEqual(["notes"]);
   });
   it("treats tab roots as full pages and their children as drill-downs", () => {
     for (const root of TAB_ROOTS) expect(isDrillDown(root)).toBe(false);
@@ -83,20 +83,20 @@ describe("home screen", () => {
   it("shows favorites as arrow rows and no repeats of the bottom tabs", async () => {
     renderApp(<HomePage />);
     const ideas = await screen.findByRole("link", { name: /Date ideas/ });
-    expect(ideas.getAttribute("href")).toBe("/plans/ideas/");
+    expect(ideas.getAttribute("href")).toBe("/activities/ideas/");
     const hrefs = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
     for (const root of TAB_ROOTS) expect(hrefs).not.toContain(root);
-    expect(hrefs).toEqual(expect.arrayContaining(["/plans/ideas/", "/checkin/notes/", "/us/story/", "/us/questions/"]));
+    expect(hrefs).toEqual(expect.arrayContaining(["/activities/ideas/", "/checkin/notes/", "/us/questions/"]));
   });
 
   it("lets each person edit their own favorites and remembers them", async () => {
     renderApp(<HomePage />);
     fireEvent.click(await screen.findByRole("button", { name: "Edit favorites" }));
     fireEvent.click(screen.getByRole("checkbox", { name: /Monthly check-in/ }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /Our Story/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Appreciation notes/ }));
     await waitFor(() => expect(screen.getByRole("link", { name: /Monthly check-in/ }).getAttribute("href")).toBe("/checkin/monthly/"));
-    expect(screen.queryByRole("link", { name: /Our Story/ })).toBeNull();
-    expect(JSON.parse(localStorage.getItem(`spark-favorites:${DEMO_ALEX}`)!)).toEqual(["buddy", "projects", "ideas", "monthly", "notes", "questions"]);
+    expect(screen.queryByRole("link", { name: /Appreciation notes/ })).toBeNull();
+    expect(JSON.parse(localStorage.getItem(`spark-favorites:${DEMO_ALEX}`)!)).toEqual(["buddy", "ideas", "monthly", "questions"]);
   });
 });
 

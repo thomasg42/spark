@@ -10,6 +10,7 @@ import { Button, EmptyState, LoadingBlock, Notice, PageHeader, useToast } from "
 import { STORY_KIND_COPY, type StoryKind } from "@/lib/domain/categories";
 import type { StoryEntry } from "@/lib/backend/types";
 import { useLoad } from "@/lib/ui/hooks";
+import {PeopleScreen} from "@/components/people/people-screen";
 import { ComingUp } from "./coming-up";
 import { missingFirsts, upsertStory, CLASSIC_FIRSTS } from "./rules";
 import { StoryForm, type StoryEditorTarget } from "./story-form";
@@ -104,9 +105,8 @@ export function StoryScreen() {
   return (
     <>
       <PageHeader
-        title="History"
-        subtitle="The moments that made you two. You can both add to it."
-        back={{ href: "/us/", label: "Us" }}
+        title="Our Story"
+        subtitle="How your story began, the people you met along the way, and everything you’re building together."
         action={
           data ? (
             <Button
@@ -122,6 +122,11 @@ export function StoryScreen() {
         }
       />
 
+      {data&&!addOpen&&<section className="mb-5 rounded-2xl border border-line bg-surface p-5" aria-labelledby="story-beginning">
+        <h2 id="story-beginning" className="text-xl font-bold">How our story began</h2>
+        <p className="my-3 text-sm text-muted">Where did you first meet? What do you each remember? Start there, then add the moments and people who became part of your life together.</p>
+        <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={()=>{const beginning=entries.find(e=>e.kind==='how_we_met');open(beginning?{mode:'edit',entry:beginning}:{mode:'add',kind:'how_we_met'},ADD_BUTTON_ID);}}>Tell our beginning</Button><Button variant="secondary" onClick={()=>open({mode:'add',kind:'met_family'},ADD_BUTTON_ID)}>Meeting a family member</Button><Button variant="secondary" onClick={()=>open({mode:'add',kind:'met_friend'},ADD_BUTTON_ID)}>Meeting a friend</Button></div>
+      </section>}
       {editor?.mode === "add" ? <div className="mb-6">{form(editor)}</div> : null}
 
       {loading && !data ? (
@@ -177,6 +182,7 @@ export function StoryScreen() {
           ) : null}
         </>
       )}
+      <details className="mt-8 rounded-2xl border border-line bg-surface p-5"><summary className="cursor-pointer text-lg font-bold">People & gatherings in our story</summary><p className="my-4 text-sm text-muted">Keep people cards and upcoming gatherings here. Their first introductions belong in the timeline above.</p><PeopleScreen embedded/></details>
     </>
   );
 }

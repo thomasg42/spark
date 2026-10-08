@@ -1,3 +1,5 @@
+import { clearBuddySessions } from "@/lib/buddy/session";
+import type { SavedConversation } from "@shared/buddy-conversations.ts";
 import type {DemoIntimacy} from './intimacy';
 import type { DreamRecord } from "@shared/shared-dreams.ts";
 /**
@@ -41,6 +43,7 @@ export interface DemoCheckin {
 }
 
 export interface DemoState {
+  buddySaved?: Record<string, SavedConversation[]>;
   intimacy?: DemoIntimacy;
   dreams?: DreamRecord[];
   dreamRoadmapConsent?: Record<string, boolean>;
@@ -111,6 +114,7 @@ function persist() {
 }
 
 export const demoStore = {
+  isPersisted():boolean {try{return typeof localStorage!=="undefined" && localStorage.getItem(STORAGE_KEY)===JSON.stringify(state);}catch{return false;}},
   get(): DemoState {
     return load();
   },
@@ -127,6 +131,7 @@ export const demoStore = {
     return () => listeners.delete(listener);
   },
   reset(fresh: boolean) {
+    clearBuddySessions();
     state = fresh ? freshState() : buildSeed(new Date());
     persist();
     listeners.forEach((l) => l());

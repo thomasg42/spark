@@ -92,7 +92,7 @@ describe("Home nudges", () => {
     });
     renderApp(<HomePage />);
     const nudge = (await screen.findByText(/same kind of plan for 3 weeks/)).closest("section")!;
-    expect(within(nudge).getByRole("link", { name: "Find a new kind of date" }).getAttribute("href")).toBe("/plans/ideas/");
+    expect(within(nudge).getByRole("link", { name: "Find a new kind of date" }).getAttribute("href")).toBe("/activities/ideas/");
     fireEvent.click(within(nudge).getByRole("button", { name: "Not now" }));
     await waitFor(() => expect(screen.queryByText(/same kind of plan for 3 weeks/)).toBeNull());
     expect(JSON.parse(localStorage.getItem(`spark-rhythm-snooze:${DEMO_ALEX}`)!)).toHaveProperty("category_rut");

@@ -6,6 +6,7 @@
 export interface JsonRequest {
   system: string;
   user: string;
+  messages?: Array<{role:"user"|"assistant"; content:string}>;
   /** JSON Schema for structured output (objects need additionalProperties: false). */
   schema: Record<string, unknown>;
   effort?: "low" | "medium" | "high";

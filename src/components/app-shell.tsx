@@ -15,9 +15,9 @@ const TABS = [
   { href: "/checkin/", label: "Check-in", icon: "♡" },
   { href: "/plans/", label: "Plans", icon: "◷" },
   { href: "/activities/", label: "Activities", icon: "◇" },
-  { href: "/history/", label: "History", icon: "↶" },
+  { href: "/projects/", label: "Projects", icon: "🔨" },
+  { href: "/our-story/", label: "Our Story", icon: "📖" },
   { href: "/intimacy/", label: "Intimacy", icon: "♡" },
-  { href: "/people/", label: "Family & Friends", icon: "♧" },
   { href: "/us/", label: "Us", icon: "∞" },
 ] as const;
 
@@ -59,7 +59,7 @@ function DemoBar() {
 
 /**
  * A drill-down screen sits one level below a tab (for example /checkin/pulse/ or
- * /plans/ideas/). It slides in from the right with its own back link. The tab
+ * /activities/ideas/). It slides in from the right with its own back link. The tab
  * bar stays put so Home and every tab are one tap away (Thomas, 2026-10-08:
  * "you can't just go back by hitting the home button").
  */

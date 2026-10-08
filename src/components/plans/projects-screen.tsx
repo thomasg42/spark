@@ -57,16 +57,7 @@ export function ProjectsScreen() {
 
   return (
     <>
-      <PageHeader title="Projects" subtitle="What you're working on together, in the order you agreed on." back={{ href: "/plans/", label: "Plans" }} />
-      <Card className="mb-5">
-        <form onSubmit={add}>
-          <TextField label="New project" value={title} onChange={setTitle} placeholder="Paint the baby's room, finish the garage…" maxLength={120} />
-          <SelectField label="Kind" value={kind} onChange={setKind} options={PROJECT_KINDS.map((k) => ({ value: k, label: `${PROJECT_KIND_COPY[k].emoji} ${PROJECT_KIND_COPY[k].label}` }))} />
-          <Button type="submit" loading={adding} disabled={!title.trim()}>
-            Add project
-          </Button>
-        </form>
-      </Card>
+      <PageHeader title="Projects" subtitle="What you're working on together, in the order you agreed on." />
       {error ? <Notice tone="danger" className="mb-3" title={error} /> : null}
       {list.error ? <Notice tone="danger" title={list.error} /> : null}
       {list.loading && !list.data ? <LoadingBlock /> : null}
@@ -112,6 +103,16 @@ export function ProjectsScreen() {
           Ask Buddy to plan a work day
         </ButtonLink>
       </div>
+      <Card className="mt-6">
+        <h2 className="mb-4 text-xl font-bold">Add a new project</h2>
+        <form onSubmit={add}>
+          <TextField label="New project" value={title} onChange={setTitle} placeholder="Paint the baby's room, finish the garage…" maxLength={120} />
+          <SelectField label="Kind" value={kind} onChange={setKind} options={PROJECT_KINDS.map((k) => ({ value: k, label: `${PROJECT_KIND_COPY[k].emoji} ${PROJECT_KIND_COPY[k].label}` }))} />
+          <Button type="submit" loading={adding} disabled={!title.trim()}>
+            Add project
+          </Button>
+        </form>
+      </Card>
     </>
   );
 }

@@ -1,3 +1,5 @@
+import { buddySession, setBuddySession, clearBuddySessions, waitBuddySession, withBuddyTurn } from "@/lib/buddy/session";
+import { readActiveConversation, readConversation } from "@shared/buddy-conversations.ts";
 import { dreams } from "./shared-dreams";
 import { fallbackHint, fallbackReply, isHintMoment, isShareLevel, MESSAGE_MAX, sanitizeClientContext, sharedTextFor, type BuddyShare, type BuddyTurn, type PartnerShare, type ShareTeaser } from "@shared/buddy.ts";
 import { hintMomentActive } from "@/lib/domain/hint-moments";
@@ -57,12 +59,16 @@ export const buddy: Backend["buddy"] = {
     await tick(60);
     const uid = me();
     myCouple();
-    return (demoStore.get().buddyChats[uid] ?? []).map(copyTurn);
+    await waitBuddySession(`demo:${uid}`);
+    return buddySession(`demo:${uid}`).turns.map(copyTurn);
   },
 
   async send(input) {
-    await tick(250);
+    return withBuddyTurn(`demo:${me()}`, async()=>{
     const uid = me();
+    const sessionId=buddySession(`demo:${uid}`).id;
+    await tick(250);
+    if(me()!==uid) throw new UserFacingError("Your session changed. Please try again.");
     myCouple();
     const text = (input.text ?? "").trim();
     if (!text) throw new UserFacingError("Say something first.");
@@ -72,16 +78,14 @@ export const buddy: Backend["buddy"] = {
       if (!findQuestion(input.interviewQuestionId)) throw new UserFacingError("That question doesn't exist.");
       interviewQuestionId = input.interviewQuestionId;
     }
-    const history = (demoStore.get().buddyChats[uid] ?? []).slice(-12).map(copyTurn);
+    const history = readActiveConversation(input.history ?? buddySession(`demo:${uid}`).turns);
     const anchor = (await dreams.list()).items.find(x => x.kind === "anchors" && x.ownerId === uid);
+    if(me()!==uid) throw new UserFacingError("Your session changed. Please try again.");
     const context = sanitizeClientContext({...input.context, lifeAnchors: anchor?.kind === "anchors" ? anchor.payload : undefined});
     const reply = fallbackReply({ text, interviewQuestionId, context, partnerShares: partnerSharesFor(uid), history });
-    demoStore.update((s) => {
-      const chat = (s.buddyChats[uid] ??= []);
-      chat.push({ role: "user", text, at: nowIso(), meta: null }, { role: "buddy", text: reply.reply, at: nowIso(), meta: reply.meta });
-      if (chat.length > 200) chat.splice(0, chat.length - 200);
-    });
+    if(buddySession(`demo:${uid}`).id===sessionId) setBuddySession(`demo:${uid}`, [...history, {role:"user",text,at:nowIso(),meta:null}, {role:"buddy",text:reply.reply,at:nowIso(),meta:reply.meta}]);
     return { reply, notice: DEMO_NOTICE };
+    });
   },
 
   async shares() {
@@ -145,11 +149,24 @@ export const buddy: Backend["buddy"] = {
     return { audio: null, reason: "off" as const };
   },
 
-  async clear() {
-    await tick(60);
-    const uid = me();
-    demoStore.update((s) => {
-      s.buddyChats[uid] = [];
-    });
+  async conversations() {
+    const uid=me();
+    const saved=(demoStore.get().buddySaved?.[uid] ?? []).map(({turns: _turns,...summary})=>summary);
+    if (demoStore.get().buddyChats[uid]?.length) saved.push({id:'legacy',title:'Earlier conversation',updatedAt:demoStore.get().buddyChats[uid]!.at(-1)!.at});
+    return saved.sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
   },
+  async saveConversation(input) {
+    const uid=me();
+    const saved={...input,title:input.title.trim().slice(0,100)||'Saved conversation',turns:readConversation(input.turns),updatedAt:nowIso()};
+    demoStore.update(s=>{const list=((s.buddySaved ??= {})[uid] ??= []); const i=list.findIndex(x=>x.id===saved.id); if(i<0) list.unshift(saved); else list[i]=saved;});
+    if (!demoStore.isPersisted()) throw new UserFacingError("This browser could not keep the saved conversation. Keep this window open and allow browser storage before trying again.");
+    return structuredClone(saved);
+  },
+  async openConversation(id) {
+    const uid=me();
+    const saved=id==='legacy' ? {id:crypto.randomUUID(),title:'Earlier conversation',turns:demoStore.get().buddyChats[uid] ?? [],updatedAt:nowIso()} : demoStore.get().buddySaved?.[uid]?.find(x=>x.id===id);
+    if(!saved) throw new UserFacingError('Conversation not found.');
+    return structuredClone(saved);
+  },
+  async clear() {clearBuddySessions(`demo:${me()}`);},
 };

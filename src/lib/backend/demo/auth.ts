@@ -1,3 +1,4 @@
+import { clearBuddySessions } from "@/lib/buddy/session";
 import { UserFacingError, type Backend, type SessionUser } from "../types";
 import { demoStore } from "./store";
 
@@ -26,6 +27,7 @@ export const auth: Backend["auth"] = {
     return current();
   },
   async signOut() {
+    clearBuddySessions();
     demoStore.update((s) => {
       s.signedIn = false;
     });

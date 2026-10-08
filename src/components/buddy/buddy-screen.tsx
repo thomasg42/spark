@@ -1,4 +1,7 @@
 "use client";
+import { buddySession, setBuddySession } from "@/lib/buddy/session";
+import type { ConversationSummary } from "@shared/buddy-conversations.ts";
+
 /**
  * Spark Buddy: a private chat with your own Buddy. You talk (or type), it fills in
  * your onboarding, coaches you, and proposes actions as cards you confirm.
@@ -69,6 +72,15 @@ export function BuddyScreen() {
   const myName = profile?.nickname || profile?.displayName || "there";
 
   const [items, setItems] = useState<ChatItem[] | null>(null);
+  const scope = `${backend.mode}:${user?.id ?? "signed-out"}`;
+  const mounted=useRef(true);
+  const activeScope=useRef(scope); activeScope.current=scope;
+  const loadedScope=useRef<string|null>(null);
+  const [savedChats,setSavedChats]=useState<ConversationSummary[]>([]);
+  const [showSaved,setShowSaved]=useState(false);
+  const [saving,setSaving]=useState(false);
+  const [saveTitle,setSaveTitle]=useState("");
+  const [confirmSwitch,setConfirmSwitch]=useState<string|null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [text, setText] = useState("");
@@ -142,15 +154,23 @@ export function BuddyScreen() {
 
   useEffect(() => {
     let alive = true;
+    mounted.current=true;
+    loadedScope.current=null;
+    itemsRef.current=null;setItems(null);setSavedChats([]);setShowSaved(false);setSaveTitle("");setConfirmSwitch(null);pendingConfirm.current=null;
+    setLoadError(null);
     Promise.all([backend.buddy.history(), backend.answers.list()])
       .then(([turns, answers]) => {
         if (!alive) return;
-        setItems(turns.map((t) => ({ ...t, key: keyOf() })));
+        loadedScope.current=scope;
+        setSaveTitle(buddySession(scope).title ?? "");
+        const restored=turns.map((t) => ({ ...t, key: keyOf() }));
+        itemsRef.current=restored;setItems(restored);
         setDone(new Set(answers.map((a) => a.questionId)));
       })
       .catch((e) => alive && setLoadError(messageOf(e)));
     return () => {
       alive = false;
+      mounted.current=false;
     };
   }, [backend, user?.id]);
 
@@ -164,7 +184,37 @@ export function BuddyScreen() {
     setDraftError(null);
   }, [question?.id]);
 
-  const push = (...more: ChatItem[]) => setItems((list) => [...(list ?? []), ...more]);
+  const replaceItems = (next:ChatItem[]) => {
+    itemsRef.current=next;
+    setBuddySession(scope,next);
+    setItems(next);
+  };
+  const push = (...more:ChatItem[]) => replaceItems([...(itemsRef.current ?? []),...more]);
+  // Preserve route navigation in this document, including completed action acknowledgments.
+  useEffect(()=>{if(items && loadedScope.current===scope) setBuddySession(scope,items);},[items,scope]);
+  async function saveConversation() {
+    if(!itemsRef.current?.length || sendingRef.current) return;
+    setSaving(true);
+    try {
+      const snapshot=itemsRef.current;
+      const title=saveTitle.trim() || snapshot.find(t=>t.role==='user')?.text.slice(0,70) || 'Saved conversation';
+      const saved=await backend.buddy.saveConversation({id:buddySession(scope).id,title,turns:snapshot});
+      setBuddySession(scope,snapshot,saved.id,saved.title);
+      setSaveTitle(saved.title);
+      toast.show('Conversation saved. Save again to keep later messages.');
+      if(showSaved) setSavedChats(await backend.buddy.conversations());
+    }catch(e){toast.show(messageOf(e),'error');}finally{setSaving(false);}
+  }
+  async function switchConversation(id:string) {
+    setSaving(true);
+    voiceMode.current=false; voice.hush(); pendingConfirm.current=null;
+    setSending(false);setInterviewing(false);setTrust(null);setText('');setSendError(null);setNotice(null);
+    try {
+      if(id==='new') {await backend.buddy.clear();setSaveTitle('');replaceItems([]);}
+      else {const saved=await backend.buddy.openConversation(id);if(!mounted.current || activeScope.current!==scope)return;setBuddySession(scope,saved.turns,saved.id,saved.title);setSaveTitle(saved.title);replaceItems(saved.turns.map(t=>({...t,key:keyOf()})));}
+      setConfirmSwitch(null);setShowSaved(false);
+    }catch(e){toast.show(messageOf(e),'error');}finally{setSaving(false);}
+  }
   /** Adds a Buddy message to the chat and returns its key. */
   const say = (textOut: string, extra: Partial<ChatItem> = {}) => {
     const key = keyOf();
@@ -228,7 +278,7 @@ export function BuddyScreen() {
 
   async function send(raw: string, viaVoice = false) {
     const message = raw.trim();
-    if (!message || sendingRef.current || !user) return;
+    if (!message || sendingRef.current || saving || !user) return;
     // A typed "yes" to Buddy's offer does it, exactly like saying yes (spoken replies are routed in handleSpoken).
     if (!viaVoice && pendingConfirm.current && parseConfirm(message)) {
       voice.hush();
@@ -246,15 +296,19 @@ export function BuddyScreen() {
     setVoiceError(null);
     setVoiceHint(null);
     setText("");
+    const previousItems=itemsRef.current ?? [];
+    const history=previousItems.map(({role,text,at,meta})=>({role,text,at,meta}));
     push({ role: "user", text: message, at: new Date().toISOString(), key: keyOf() });
     try {
       const context = await buildBuddyContext(backend, { userId: user.id, profile, partner, couple });
-      const { reply, notice: n } = await backend.buddy.send({ text: message, interviewQuestionId: question?.id ?? null, context, aiConsent: live && ai.aiOn });
+      if(!mounted.current || activeScope.current!==scope) return;
+      const { reply, notice: n } = await backend.buddy.send({ history, text: message, interviewQuestionId: question?.id ?? null, context, aiConsent: live && ai.aiOn });
+      if(!mounted.current || activeScope.current!==scope) return;
       if (n) setNotice(n);
       // In the interview, an answer proposal fills the card (and saves it, with auto-save on).
       const answer = question ? reply.actions.find((a) => (a.type === "save_answer" || a.type === "skip_question") && a.questionId === question.id) : undefined;
       const rest = reply.actions.filter((a) => a !== answer);
-      const key = say(reply.reply, { actions: rest, crisis: reply.crisis, followUp: reply.followUp ?? null });
+      const key = say(reply.reply, { meta: reply.meta, actions: rest, crisis: reply.crisis, followUp: reply.followUp ?? null });
       // What Buddy says out loud: the reply, then whatever it is now waiting on.
       let spoken = reply.reply;
       if (reply.crisis) {
@@ -289,6 +343,8 @@ export function BuddyScreen() {
       }
       void speakThenListen(spoken);
     } catch (e) {
+      if(!mounted.current || activeScope.current!==scope) return;
+      replaceItems(previousItems);
       setSendError(messageOf(e));
       setText(message);
     } finally {
@@ -299,7 +355,7 @@ export function BuddyScreen() {
 
   /** Removes one card by identity (indexes shift as cards are done one after another). */
   function dropAction(itemKey: string, action: BuddyAction, extra: Partial<ChatItem> = {}) {
-    setItems((list) => (list ?? []).map((x) => (x.key === itemKey ? { ...x, ...extra, actions: x.actions?.filter((a) => a !== action) } : x)));
+    replaceItems((itemsRef.current ?? []).map((x) => (x.key === itemKey ? { ...x, ...extra, actions: x.actions?.filter((a) => a !== action) } : x)));
     const offer = pendingConfirm.current;
     if (offer?.key === itemKey && offer.actions.includes(action)) {
       const left = offer.actions.filter((a) => a !== action);
@@ -326,7 +382,7 @@ export function BuddyScreen() {
       const lastOne = !(latest.actions ?? []).some((a) => a !== action && a.type !== "open");
       const followUp = !quiet && lastOne ? latest.followUp : null;
       dropAction(item.key, action, followUp ? { followUp: null } : {});
-      if (msg) toast.show(msg);
+      if (msg) {toast.show(msg); say(`Completed: ${msg}`, {meta:null});}
       if (followUp) {
         say(followUp);
         void speakThenListen(followUp);
@@ -457,6 +513,8 @@ export function BuddyScreen() {
   /** Stop and Cancel remove the region holding the focused button: hand focus back to Talk. */
   const refocusTalk = () => requestAnimationFrame(() => talkRef.current?.focus());
 
+  if(loadedScope.current!==scope && !loadError) return <Spinner label="Opening your conversation…" />;
+
   return (
     <div className="flex flex-col">
       <PageHeader
@@ -464,6 +522,21 @@ export function BuddyScreen() {
         subtitle={`Your private helper. Only you see this chat. ${partnerName}'s Buddy knows only what ${partnerName} chooses to share.`}
         back={{ href: "/us/", label: "Us" }}
       />
+      <Card className="mb-4">
+        <p className="mb-3 text-sm text-muted">This conversation stays while you move around Spark. Closing or reloading the app starts fresh. Save it to reopen later. Saved chats are private to you.</p>
+        <label className="block text-sm font-semibold">Conversation name (optional)
+          <input className="mt-1 mb-3 block w-full rounded-xl border border-line bg-surface px-3 py-2" value={saveTitle} maxLength={100} onChange={e=>setSaveTitle(e.target.value)} placeholder="A name to find this conversation" />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={()=>void saveConversation()} loading={saving} disabled={!items?.length || sending || !!busyAction}>Save Conversation</Button>
+          <Button variant="secondary" disabled={sending || saving || !!busyAction} onClick={async()=>{try{setSavedChats(await backend.buddy.conversations());setShowSaved(v=>!v);}catch(e){toast.show(messageOf(e),'error');}}}>Saved conversations</Button>
+          <Button variant="ghost" disabled={sending || saving || !!busyAction} onClick={()=>setConfirmSwitch('new')}>New conversation</Button>
+        </div>
+        {showSaved ? <div className="mt-4" aria-label="Saved conversations">
+          {!savedChats.length ? <p>No saved conversations yet.</p> : savedChats.map(chat=><button key={chat.id} className="my-2 block w-full rounded-xl border border-line p-3 text-left" onClick={()=>setConfirmSwitch(chat.id)} disabled={sending || saving || !!busyAction}><strong>{chat.title}</strong><span className="block text-sm text-muted">Saved {new Date(chat.updatedAt).toLocaleString()}</span></button>)}
+        </div> : null}
+        {confirmSwitch ? <div className="mt-4" role="group" aria-label="Change conversation"><p className="mb-2">Save any changes you want to keep before leaving this conversation.</p><div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={saving || sending || !!busyAction} onClick={()=>void switchConversation(confirmSwitch)}>{confirmSwitch==='new' ? 'Start fresh' : 'Open conversation'}</Button><Button variant="ghost" onClick={()=>setConfirmSwitch(null)}>Keep chatting</Button></div></div> : null}
+      </Card>
       {/* Its own row under the title: in the header, two buttons squeezed "Spark Buddy" on a phone. */}
       <div className="-mt-2 mb-4 flex flex-wrap gap-2">
         <button
@@ -740,22 +813,7 @@ export function BuddyScreen() {
               Fill out my onboarding
             </Button>
           ) : null}
-          {items?.length ? (
-            <Button
-              variant="ghost"
-              className="ml-auto text-sm"
-              onClick={async () => {
-                try {
-                  await backend.buddy.clear();
-                  setItems([]);
-                } catch (e) {
-                  toast.show(messageOf(e), "error");
-                }
-              }}
-            >
-              Clear chat
-            </Button>
-          ) : null}
+
         </div>
       </form>
     </div>

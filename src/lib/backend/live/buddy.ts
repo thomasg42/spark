@@ -1,3 +1,5 @@
+import { buddySession, setBuddySession, clearBuddySessions, waitBuddySession, withBuddyTurn } from "@/lib/buddy/session";
+import type { SavedConversation, ConversationSummary } from "@shared/buddy-conversations.ts";
 import { dreams } from "./shared-dreams";
 import { isShareLevel, MESSAGE_MAX, SPEAK_CHUNK_MAX } from "@shared/buddy.ts";
 import { findQuestion } from "@shared/questionnaires.ts";
@@ -8,7 +10,8 @@ import { invoke, requireUserId } from "./client";
  * Spark Buddy goes entirely through the "buddy" Edge Function. It is the only
  * place that can open the partner's opt-in shares (sealed under the couple key),
  * so the partner's hints and open answers never reach this browser: only Buddy's
- * reply does. Conversations are stored encrypted and readable only by their owner.
+ * reply does. Active conversations stay in document memory; only explicit saves
+ * are stored encrypted and readable by their owner.
  */
 
 function knownQuestion(questionId: string) {
@@ -17,19 +20,25 @@ function knownQuestion(questionId: string) {
 
 export const buddy: Backend["buddy"] = {
   async history() {
-    await requireUserId();
-    const { turns } = await invoke<{ turns: BuddyTurn[] }>("buddy", { action: "history" });
-    return turns ?? [];
+    const uid=await requireUserId();
+    await waitBuddySession(`live:${uid}`);
+    return structuredClone(buddySession(`live:${uid}`).turns);
   },
   async send(input) {
-    await requireUserId();
+    const uid = await requireUserId();
+    const sessionId=buddySession(`live:${uid}`).id;
+    return withBuddyTurn(`live:${uid}`, async()=>{
     const text = (input.text ?? "").trim();
     if (!text) throw new UserFacingError("Say something first.");
     if (Array.from(text).length > MESSAGE_MAX) throw new UserFacingError("That's a lot at once. Try a shorter message.");
-    const uid = await requireUserId();
     const anchor = (await dreams.list()).items.find(x => x.kind === "anchors" && x.ownerId === uid);
     const context = {...input.context, lifeAnchors: anchor?.kind === "anchors" ? anchor.payload : undefined};
-    return invoke<BuddySendResult>("buddy", { action: "send", text, interviewQuestionId: input.interviewQuestionId, context, aiConsent: input.aiConsent === true });
+    if(await requireUserId()!==uid) throw new UserFacingError("Your session changed. Please try again.");
+    const history=input.history ?? buddySession(`live:${uid}`).turns;
+    const result=await invoke<BuddySendResult>("buddy", { action: "send", history, text, interviewQuestionId: input.interviewQuestionId, context, aiConsent: input.aiConsent === true });
+    if(buddySession(`live:${uid}`).id===sessionId) setBuddySession(`live:${uid}`, [...history,{role:"user",text,at:new Date().toISOString(),meta:null},{role:"buddy",text:result.reply.reply,at:new Date().toISOString(),meta:result.reply.meta}]);
+    return result;
+    });
   },
   async shares() {
     await requireUserId();
@@ -73,8 +82,8 @@ export const buddy: Backend["buddy"] = {
     }
   },
 
-  async clear() {
-    await requireUserId();
-    await invoke<{ ok: true }>("buddy", { action: "clear" });
-  },
+  async conversations() {return (await invoke<{conversations:ConversationSummary[]}>("buddy",{action:"conversations"})).conversations;},
+  async saveConversation(input) {return (await invoke<{conversation:SavedConversation}>("buddy",{action:"save_conversation",...input})).conversation;},
+  async openConversation(id) {return (await invoke<{conversation:SavedConversation}>("buddy",{action:"open_conversation",id})).conversation;},
+  async clear() {clearBuddySessions(`live:${await requireUserId()}`);},
 };

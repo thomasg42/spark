@@ -41,7 +41,7 @@ function Dashboard() {
   const wants = (id: FavoriteId) => favorites?.includes(id) ?? false;
   const data = useLoad(async () => {
     if (!favorites) return null;
-    const [story, ideas, notes, answers, history, pulses, plans, rules, projects, money] = await Promise.all([
+    const [story, ideas, notes, answers, history, pulses, plans, rules, money] = await Promise.all([
       settle(backend.story.list()),
       wants("ideas") ? settle(backend.ideas.list()) : null,
       wants("notes") ? settle(backend.notes.list()) : null,
@@ -50,11 +50,10 @@ function Dashboard() {
       wants("pulse") ? settle(backend.pulse.history(8)) : null,
       settle(backend.datePlans.list()),
       settle(backend.dateRules.list()),
-      wants("projects") ? settle(backend.projects.list()) : null,
       wants("money") ? settle(backend.money.list()) : null,
     ]);
     const week = wants("pulse") ? await settle(backend.pulse.status(weekStartOf(today))) : null;
-    return { story, ideas, notes, answers, history, pulses, week, plans, rules, projects, money };
+    return { story, ideas, notes, answers, history, pulses, week, plans, rules, money };
   }, [backend, user?.id, favorites?.join(",")]);
 
   const partnerName = partner?.nickname || partner?.displayName || "your partner";
@@ -88,8 +87,6 @@ function Dashboard() {
         const latest = d?.notes?.find((n) => n.authorId === partner?.userId);
         return { text: latest ? `“${latest.body}”` : `Send ${partnerName} a one-line thank-you` };
       }
-      case "story":
-        return { text: d?.story?.length ? `${d.story.length} ${d.story.length === 1 ? "memory" : "memories"} so far` : "Start with how you met" };
       case "questions": {
         const saved = Object.fromEntries((d?.answers ?? []).map((a) => [a.questionId, a]));
         const progress = SECTIONS.map((s) => sectionProgress(s, saved));
@@ -101,10 +98,6 @@ function Dashboard() {
         return { text: "Add something you did together" };
       case "buddy":
         return { text: `Talk it through, fill in your answers, plan time with ${partnerName}` };
-      case "projects": {
-        const open = d?.projects?.filter((p) => p.status !== "done") ?? [];
-        return { text: open.length ? `1. ${open[0]!.title}${open.length > 1 ? ` · ${open.length - 1} more` : ""}` : "What you're working on, in order" };
-      }
       case "money": {
         const joint = d?.money?.filter((g) => g.scope === "joint") ?? [];
         const saved = joint.reduce((n, g) => n + g.savedCents, 0);

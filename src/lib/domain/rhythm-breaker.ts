@@ -65,7 +65,7 @@ export interface RhythmCard {
 }
 
 const ACTION_FOR: Record<SuggestionKind, CardAction> = {
-  new_category: { label: "Find a new kind of date", href: "/plans/ideas/" },
+  new_category: { label: "Find a new kind of date", href: "/activities/ideas/" },
   standing_date: { label: "Set a standing date night", href: "/plans/standing/" },
   surprise: { label: "Send a little note", href: "/checkin/notes/" },
   tech_free_night: { label: "Plan a tech-free night with Buddy", href: "/us/buddy/" },

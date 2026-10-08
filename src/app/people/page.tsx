@@ -1,4 +1,2 @@
-import {RequireStage} from '@/components/require-stage';
-import {PeopleScreen} from '@/components/people/people-screen';
-export const metadata={title:'Family & Friends'};
-export default function Page(){return <RequireStage allow="ready"><PeopleScreen/></RequireStage>;}
+import {LegacyRoute} from "@/components/legacy-route";
+export default function Page(){return <LegacyRoute href="/our-story/"/>;}

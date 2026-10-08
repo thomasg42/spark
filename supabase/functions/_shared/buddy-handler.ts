@@ -1,3 +1,4 @@
+import { readActiveConversation, readConversation, type SavedConversation } from "./buddy-conversations.ts";
 import { coachSupport } from "./shared-dreams.ts";
 /**
  * "buddy" Edge Function logic (Spark Buddy), kept free of Deno APIs so it is unit
@@ -6,19 +7,21 @@ import { coachSupport } from "./shared-dreams.ts";
  * Runs with the signed-in user's JWT, so RLS applies to every read and write:
  *   buddy_shares    the owner reads and writes their own; the partner can read only
  *                   rows marked hint or open (off-the-table answers never get a row)
- *   buddy_messages  owner only
+ *   buddy_conversations owner-only explicit saves; buddy_messages legacy only
  * The repo ALSO filters by user id as a second, independent guard.
  *
  * Encryption:
  *   - Shares are sealed under the COUPLE scope (so the partner's Buddy can open
  *     them) and bound to (owner, question). Only the approved hint or the answer
  *     snapshot the owner saw is ever sealed there, never anything off the table.
- *   - Conversation turns are sealed under the USER scope, bound to the row id.
+ *   - Explicitly saved transcripts and titles are sealed under the USER scope, bound to their id.
+ *   - Unsaved turns are supplied by the active client session and never persisted.
  *   - Private answers are read (user scope) only to build the caller's own share.
  * Never log messages, answers, hints, ciphertext or keys.
  *
  * Actions (body.action):
- *   history                                   -> { turns }
+ *   history                                   -> empty (legacy chats require explicit reopen)
+ *   conversations / open_conversation / save_conversation -> owner-only saved chats
  *   send   { text, interviewQuestionId?, context, aiConsent } -> { reply, notice }
  *          Claude is called ONLY when aiConsent is true (the person turned AI on).
  *   shares                                    -> { shares }   the caller's own
@@ -79,7 +82,12 @@ export interface MessageRow {
   created_at: string;
 }
 
+export interface ConversationRow {id:string; body_ciphertext:string; updated_at:string}
 export interface BuddyRepo {
+  conversations(): Promise<ConversationRow[]>;
+  conversation(id:string): Promise<ConversationRow|null>;
+  saveConversation(row:{id:string; ciphertext:string; updatedAt:string}): Promise<void>;
+  chargeMessage(): Promise<number>;
   /** The caller's couple and partner, or null when not paired. */
   couple(): Promise<{ coupleId: string; partnerId: string | null } | null>;
   /** Share rows of one member (RLS: own rows, or the partner's hint/open rows). */
@@ -105,6 +113,25 @@ const SHARE_COLUMNS = "user_id, question_id, level, shared_ciphertext, updated_a
 
 export function createSupabaseBuddyRepo(supabase: SupabaseClient, userId: string): BuddyRepo {
   return {
+    async conversations() {
+      const {data,error}=await supabase.from("buddy_conversations").select("id,body_ciphertext,updated_at").eq("user_id",userId).order("updated_at",{ascending:false}).limit(100);
+      if(error) dbError(error,"Could not load saved conversations.");
+      return (data ?? []) as ConversationRow[];
+    },
+    async conversation(id) {
+      const {data,error}=await supabase.from("buddy_conversations").select("id,body_ciphertext,updated_at").eq("user_id",userId).eq("id",id).maybeSingle();
+      if(error) dbError(error,"Could not open that conversation.");
+      return data as ConversationRow|null;
+    },
+    async saveConversation(row) {
+      const {error}=await supabase.from("buddy_conversations").upsert({id:row.id,user_id:userId,body_ciphertext:row.ciphertext,updated_at:row.updatedAt});
+      if(error) dbError(error,"Could not save that conversation.");
+    },
+    async chargeMessage() {
+      const {data,error}=await supabase.rpc("buddy_chat_charge");
+      if(error) dbError(error,"Could not check your message usage.");
+      return Number(data);
+    },
     async couple() {
       const { data: member, error } = await supabase.from("couple_members").select("couple_id").eq("user_id", userId).maybeSingle();
       if (error) dbError(error, "Could not load your couple.");
@@ -291,9 +318,40 @@ export function createBuddyHandler(deps: BuddyDeps): Handler {
       return turns;
     }
 
+    const conversationAad=(id:string)=>`buddy-conversation:${userId}:${id}`;
+    async function openConversation(row:ConversationRow):Promise<SavedConversation> {
+      const data=await sealer!.decryptJson<{title:string;turns:BuddyTurn[]}>(row.body_ciphertext,scopes.user(userId!),conversationAad(row.id));
+      return {id:row.id,title:data.title,turns:readConversation(data.turns),updatedAt:row.updated_at};
+    }
+    function readTurns(value:unknown) {try{return readConversation(value);}catch(e){throw new HttpError(400,e instanceof Error ? e.message : "Invalid conversation.");}}
+    function conversationId() {if(typeof body.id!=="string" || !/^[0-9a-f-]{36}$/i.test(body.id)) throw new HttpError(400,"Invalid conversation.");return body.id;}
+
     switch (body.action) {
       case "history":
-        return { turns: await history(60) };
+        return { turns: [] }; // Old durable chats are available only through explicit reopen.
+      case "conversations": {
+        const conversations=[];
+        for(const row of await deps.repo.conversations()) {const {turns:_turns,...info}=await openConversation(row);conversations.push(info);}
+        const legacy=await deps.repo.messages(1);
+        if(legacy.length) conversations.push({id:"legacy",title:"Earlier conversation",updatedAt:legacy[0]!.created_at});
+        return {conversations};
+      }
+      case "open_conversation": {
+        if(body.id==="legacy") return {conversation:{id:newId(),title:"Earlier conversation",turns:await history(1000),updatedAt:now().toISOString()}};
+        const row=await deps.repo.conversation(conversationId());
+        if(!row) throw new HttpError(404,"Conversation not found.");
+        return {conversation:await openConversation(row)};
+      }
+      case "save_conversation": {
+        const id=conversationId();
+        const title=typeof body.title==="string" ? body.title.trim().slice(0,100) : "";
+        const turns=readTurns(body.turns);
+        if(!turns.length || !title) throw new HttpError(400,"Give your conversation a title and at least one message.");
+        const updatedAt=now().toISOString();
+        const ciphertext=await sealer.encryptJson({title,turns},scopes.user(userId),conversationAad(id));
+        await deps.repo.saveConversation({id,ciphertext,updatedAt});
+        return {conversation:{id,title,turns,updatedAt}};
+      }
 
       case "send": {
         const text = typeof body.text === "string" ? body.text.trim() : "";
@@ -302,13 +360,14 @@ export function createBuddyHandler(deps: BuddyDeps): Handler {
         let interviewQuestionId: string | null = null;
         if (body.interviewQuestionId !== undefined && body.interviewQuestionId !== null) interviewQuestionId = readQuestion({ questionId: body.interviewQuestionId }).id;
 
-        const at = now();
-        if ((await deps.repo.userMessagesSince(new Date(at.getTime() - 86_400_000).toISOString())) >= MAX_USER_MESSAGES_PER_DAY) {
+        let past:BuddyTurn[];
+        try {past=readActiveConversation(body.history ?? []);} catch(e){throw new HttpError(400,(e as Error).message);}
+        if ((await deps.repo.chargeMessage()) > MAX_USER_MESSAGES_PER_DAY) {
           throw new HttpError(429, RATE_LIMIT_MESSAGE);
         }
 
         const context = sanitizeClientContext(body.context);
-        const [partnerShares, past] = await Promise.all([couple.partnerId ? openShares(couple.partnerId) : Promise.resolve([]), history(12)]);
+        const partnerShares = couple.partnerId ? await openShares(couple.partnerId) : [];
         const request = { text, interviewQuestionId, context, partnerShares, history: past };
 
         let reply: BuddyReply;
@@ -324,7 +383,7 @@ export function createBuddyHandler(deps: BuddyDeps): Handler {
           const aiConsent = body.aiConsent === true;
           if (deps.generate && aiConsent) {
             const prompt = buildBuddyPrompt(request);
-            result = await deps.generate({ system: prompt.system, user: prompt.user, schema: BUDDY_SCHEMA, effort: "medium", maxTokens: 3000 });
+            result = await deps.generate({ system: prompt.system, user: prompt.user, messages: prompt.messages, schema: BUDDY_SCHEMA, effort: "medium", maxTokens: 3000 });
           }
           const parsed = result?.ok ? parseBuddyJson(result.json, request) : null;
           if (parsed) {
@@ -335,12 +394,6 @@ export function createBuddyHandler(deps: BuddyDeps): Handler {
           }
         }
 
-        const userTurnId = newId();
-        const buddyTurnId = newId();
-        await deps.repo.insertMessages([
-          { id: userTurnId, coupleId: couple.coupleId, role: "user", ciphertext: await sealer.encryptJson({ text }, scopes.user(userId), aad.buddyMessage(userId, userTurnId)) },
-          { id: buddyTurnId, coupleId: couple.coupleId, role: "buddy", ciphertext: await sealer.encryptJson({ text: reply.reply, meta: reply.meta }, scopes.user(userId), aad.buddyMessage(userId, buddyTurnId)) },
-        ]);
         return { reply, notice };
       }
 

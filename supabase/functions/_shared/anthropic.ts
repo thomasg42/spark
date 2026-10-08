@@ -24,7 +24,7 @@ export function createClaudeGenerator(apiKey: string | undefined): JsonGenerator
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
         system: request.system,
-        messages: [{ role: "user", content: request.user }],
+        messages: request.messages ?? [{ role: "user", content: request.user }],
         output_config: {
           effort: request.effort ?? "medium",
           format: { type: "json_schema", schema: sanitizeSchema(request.schema) as Record<string, unknown> },
