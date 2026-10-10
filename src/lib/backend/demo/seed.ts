@@ -39,6 +39,15 @@ export function freshState(): DemoState {
     distanceFlags: [],
     projects: [],
     money: [],
+    boundaries: [],
+    boundaryAcks: [],
+    boundarySeen: {},
+    agreements: [],
+    goals: [],
+    goalDrafts: [],
+    goalMilestones: [],
+    goalEvents: [],
+    goalCheckins: [],
   };
 }
 
@@ -242,5 +251,14 @@ export function buildSeed(today: Date): DemoState {
       { id: "seed-goal-sam-1", ownerId: DEMO_SAM, scope: "mine", title: "New camera", savedCents: 34000, targetCents: 90000, targetDate: day(120), visibleToPartner: true, createdAt: at(-20), updatedAt: at(-5) },
       { id: "seed-goal-sam-2", ownerId: DEMO_SAM, scope: "mine", title: "Private sample goal Sam keeps to themself", savedCents: 50000, targetCents: null, targetDate: null, visibleToPartner: false, createdAt: at(-20), updatedAt: at(-5) },
     ],
+    boundaries: [],
+    boundaryAcks: [],
+    boundarySeen: {},
+    agreements: [],
+    goals: [],
+    goalDrafts: [],
+    goalMilestones: [],
+    goalEvents: [],
+    goalCheckins: [],
   };
 }

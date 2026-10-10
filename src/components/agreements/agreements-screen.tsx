@@ -2,17 +2,22 @@
 import Link from "next/link";
 import { useState } from "react";
 import { PageHeader } from "@/components/ui";
+import { AgreementsTabs } from "./boundaries-screen";
 import { LifeChangeCard } from "./life-change-card";
 import { RhythmCard } from "./rhythm-card";
 import { SocialCard } from "./social-card";
+import { useApp } from "@/components/app-provider";
+import { useLoad } from "@/lib/ui/hooks";
 
 /** /us/agreements/: check-in rhythm and social media, with both partners' choices shown openly. */
 export function AgreementsScreen() {
-  // A logged life change moves the shared rhythm: remount the rhythm card so it re-reads.
+  const { backend, user } = useApp();
+  const unseen = useLoad(async () => (await backend.boundaries.list()).unseenIds.length, [backend, user?.id]);
   const [version, setVersion] = useState(0);
   return (
     <>
       <PageHeader title="Agreements" subtitle="Both choices, shown openly. Spark finds a fair middle." back={{ href: "/us/", label: "Us" }} />
+      <AgreementsTabs current="rhythm" unseen={unseen.data ?? 0} />
       <RhythmCard key={version} />
       <LifeChangeCard onChange={() => setVersion((v) => v + 1)} />
       <SocialCard />

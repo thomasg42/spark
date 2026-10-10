@@ -6,6 +6,8 @@ const basePath = (process.env.BASE_PATH ?? "").replace(/\/$/, "");
 
 const config: NextConfig = {
   output: "export",
+  // Playwright and local checks use 127.0.0.1. Next blocks that host's dev assets unless it is listed.
+  allowedDevOrigins: ["127.0.0.1"],
   basePath: basePath || undefined,
   trailingSlash: true,
   images: { unoptimized: true },

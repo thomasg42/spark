@@ -123,12 +123,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [stage, drill, pathname]);
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="app-shell">
       <a href="#main" className="sr-only-focusable fixed left-2 top-2 z-50 rounded-full bg-accent px-4 py-2 font-semibold text-accent-ink">
         Skip to content
       </a>
       <DemoBar />
-      <header className="border-b border-line bg-bg/90 backdrop-blur supports-[backdrop-filter]:bg-bg/75">
+      <header className="shrink-0 border-b border-line bg-bg/90 backdrop-blur supports-[backdrop-filter]:bg-bg/75">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
           <Link href={stage === "ready" ? "/home/" : "/"} className="flex min-h-11 items-center gap-2 font-display text-xl font-bold text-ink">
             <span aria-hidden className="text-deco">✦</span> Spark
@@ -142,25 +142,26 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main id="main" tabIndex={-1} className={cx("mx-auto w-full max-w-2xl flex-1 px-4 pt-6 focus:outline-none", showTabs ? "pb-nav" : "pb-12")}>
-        <div key={pathname} className={drill ? "slide-in-right" : undefined}>
-          {children}
-        </div>
-      </main>
-
-      <footer className={cx("mx-auto w-full max-w-2xl px-4 text-center text-xs text-muted", showTabs && "mb-20")} style={{ paddingBottom: "calc(1.5rem + var(--checkin-prompt-h, 0px))" }}>
-        <p>
-          <Link href="/support/" className="font-semibold text-accent-text underline">
-            Need support now?
-          </Link>{" "}
-          · <Link href="/privacy/" className="underline">What's private</Link> · Spark is not therapy. 18+ only.
-        </p>
-      </footer>
+      <div id="app-scroll">
+        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-2xl px-4 pt-6 focus:outline-none">
+          <div key={pathname} className={drill ? "slide-in-right" : undefined}>
+            {children}
+          </div>
+        </main>
+        <footer className={cx("mx-auto w-full max-w-2xl px-4 text-center text-xs text-muted", showTabs ? "pb-nav" : "pb-12")}>
+          <p>
+            <Link href="/support/" className="font-semibold text-accent-text underline">
+              Need support now?
+            </Link>{" "}
+            · <Link href="/privacy/" className="underline">What's private</Link> · Spark is not therapy. 18+ only.
+          </p>
+        </footer>
+      </div>
 
       <CheckinPrompt aboveTabs={showTabs} />
 
       {showTabs ? (
-        <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+        <nav id="tabbar" aria-label="Main" className="app-tabbar border-t border-line bg-surface/95 backdrop-blur">
           <ul className="mx-auto flex max-w-2xl overflow-x-auto overscroll-x-contain">
             {visibleTabs.map((tab) => {
               const active = pathname === tab.href || pathname.startsWith(tab.href);
@@ -178,7 +179,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     aria-current={active ? "page" : undefined}
                     className={cx("flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 text-center text-xs font-semibold", active ? "text-accent-text" : "text-muted")}
                   >
-                    <span aria-hidden className={cx("text-xl leading-none", active && "pop")}>
+                    <span aria-hidden className="text-xl leading-none">
                       {tab.icon}
                     </span>
                     {tab.label}

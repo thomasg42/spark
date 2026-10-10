@@ -1,6 +1,8 @@
 import {intimacy} from './intimacy';
 import { dreams } from "./shared-dreams";
 import type { Backend } from "../types";
+import { boundaries } from "./boundaries";
+import { ourGoals } from "./goals";
 import { activities } from "./activities";
 import { answers } from "./answers";
 import { auth } from "./auth";
@@ -56,5 +58,7 @@ export function createDemoBackend(): Backend {
     distanceFlags,
     projects,
     money,
+    boundaries,
+    ourGoals,
   };
 }

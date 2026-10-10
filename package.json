@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:privacy": "vitest run tests/db",
+    "test:nav": "playwright test",
     "check:functions": "bash scripts/check-functions.sh",
     "seed": "tsx scripts/seed.ts"
   },
@@ -30,6 +31,7 @@
     "@tailwindcss/postcss": "4.3.3",
     "@testing-library/dom": "latest",
     "@testing-library/react": "16.3.3",
+    "@playwright/test": "1.56.1",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",

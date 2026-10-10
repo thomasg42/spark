@@ -44,8 +44,8 @@ describe("questions hub", () => {
     const { container } = render(<QuestionsPage />);
     expect(screen.getByText(PRIVATE_ANSWERS_PROMISE)).toBeTruthy();
     const links = await screen.findAllByRole("link", { name: /Not started|done|All done/ });
-    expect(links.map(hrefOf)).toEqual(["/us/questions/roots/", "/us/questions/beginnings/", "/us/questions/closeness_trust/", "/us/questions/attachment/", "/us/questions/direction/"]);
-    expect(screen.getAllByRole("progressbar")).toHaveLength(5);
+    expect(links.map(hrefOf)).toEqual(["/us/questions/roots/", "/us/questions/beginnings/", "/us/questions/closeness_trust/", "/us/questions/attachment/", "/us/questions/direction/", "/us/questions/connection/"]);
+    expect(screen.getAllByRole("progressbar")).toHaveLength(6);
     // Privacy promise comes before the first set in reading order.
     const text = container.textContent ?? "";
     expect(text.indexOf(PRIVATE_ANSWERS_PROMISE)).toBeLessThan(text.indexOf("Beginnings"));

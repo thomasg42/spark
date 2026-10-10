@@ -14,6 +14,16 @@ The live model receives all active turns as user/assistant messages, replacing t
 
 The demo is still the built-in guide, with earlier-detail recall; this change does not activate Claude. Backend deployment needs migration 1200 plus the updated Buddy function. No real backend or paid model was used for verification.
 
+## Boundaries, Our Goals, and connection questions (2026-10-10)
+
+Agreements now has a Boundaries tab (`/us/agreements/boundaries/`). Each person writes "what matters to me" and "what I'll do if it's crossed." Drafts stay private. Sharing is a separate tap. The partner can say Understood or Let's talk about it. There is no reject and no notification. Versioned "Our agreements" need both people to accept.
+
+Our Goals lives under Plans (`/plans/goals/`), not a new bottom tab, because Plans already holds future work and the bottom bar is crowded. Private versions stay hidden until both submit, then they merge into one goal with a part for each person. Private dreams, weekly forecasts, and support asks stay in Shared Dreams (Module L). There was no separate Foundations module to merge.
+
+Connection questions are a new private set under Questions. Skip any time. The coach offers one only when things are calm.
+
+The phone tab bar is pinned to the bottom of a single scroll area (`#app-scroll`). Explore positions, in the idea library, opens a live guide in a new tab. The note on that screen is the only box you type in, and it stays on the device.
+
 ## Intimacy and navigation (Module K)
 
 Enable Intimacy independently in **Us → Settings** for each adult profile. `/intimacy/` contains mutual overlaps and private sparks; `/intimacy/comfort/`, `/intimacy/library/`, `/intimacy/coach/` and `/intimacy/reflection/` cover the private map, neutral illustrated library, structured guide and private debrief. No and Not now choices are never shown to the partner. The guide uses `prompts/spark-coach.md` plus `prompts/intimacy-overlay.md`; live AI can select only a known response topic, with no raw generated prose or URLs rendered. It is not unrestricted chat. Demo is fictional Alex/Sam browser data.

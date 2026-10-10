@@ -27,7 +27,8 @@ function PlansHub() {
   return (
     <div className="mb-6">
       <DrillList label="Plans">
-        <li><DrillRow href="/plans/dreams/" icon="↗" title="Shared Dreams & Support" status="Our future, weekly support, and Life Anchors" /></li>
+        <li><DrillRow href="/plans/goals/" icon="◎" title="Our Goals" status="Goals you both own, with a part for each of you." /></li>
+        <li><DrillRow href="/plans/dreams/" icon="↗" title="Shared Dreams & Support" status="Private dreams, weekly support, and Life Anchors" /></li>
         <li>
           <DrillRow href="/plans/standing/" icon="◷" title="Standing date night" status={standing ? `${describeRule(standing.rule)}${standing.tonight ? " · tonight" : ""}` : "The same night every week, set once"} />
         </li>

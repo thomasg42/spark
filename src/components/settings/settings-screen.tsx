@@ -38,6 +38,13 @@ export function SettingsScreen() {
       </Link>
       <AccountCard />
       <DataCard />
+      <section className="mt-4 rounded-[var(--radius-card)] border border-line bg-surface px-5 py-4" aria-labelledby="notifications-title">
+        <h2 id="notifications-title" className="font-bold text-ink">Notifications</h2>
+        <label className="mt-2 flex items-start gap-3 text-sm text-muted">
+          <input type="checkbox" checked={false} disabled readOnly aria-disabled="true" />
+          <span>Off. Notifications are not built yet. Spark does not send a push, email, or text when a boundary is shared.</span>
+        </label>
+      </section>
     </>
   );
 }

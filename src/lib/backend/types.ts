@@ -1,5 +1,7 @@
 import type { SavedConversation, ConversationSummary } from "@shared/buddy-conversations.ts";
 import type {IntimacyApi} from '@shared/intimacy.ts';
+import type { AgreementRecord, BoundaryAck, BoundaryRecord, BoundaryReview } from "@shared/boundaries.ts";
+import type { GoalCard, GoalType } from "@shared/our-goals.ts";
 import type { DreamsApi } from "@shared/shared-dreams.ts";
 /**
  * The contract between the UI and data. Two implementations:
@@ -522,6 +524,33 @@ export interface Backend {
     /** Adds (or, with a negative amount, takes out) money saved toward a goal. */
     addSaved(id: string, cents: number): Promise<MoneyGoal>;
     remove(id: string): Promise<void>;
+  };
+
+  /** Agreements → Boundaries, plus versioned agreements both people accept. */
+  boundaries: {
+    list(): Promise<{ mine: BoundaryRecord[]; partner: BoundaryRecord[]; agreements: AgreementRecord[]; unseenIds: string[]; acks: BoundaryAck[] }>;
+    save(input: { id?: string; category: BoundaryRecord["category"]; text: string; myAction: string }): Promise<BoundaryRecord>;
+    setStatus(id: string, status: "shared" | "archived"): Promise<BoundaryRecord>;
+    removeDraft(id: string): Promise<void>;
+    ack(id: string, response: BoundaryAck["response"]): Promise<void>;
+    markSeen(): Promise<void>;
+    propose(body: string): Promise<AgreementRecord>;
+    accept(id: string): Promise<AgreementRecord>;
+    revise(id: string, body: string): Promise<AgreementRecord>;
+    leave(id: string): Promise<AgreementRecord>;
+    review(text: string, myAction: string): BoundaryReview;
+  };
+
+  /** Shared goals both people own. Private dream-board items stay on Module L. */
+  ourGoals: {
+    list(): Promise<GoalCard[]>;
+    start(type: GoalType): Promise<GoalCard>;
+    submitDraft(id: string, input: { version: string; why: string }): Promise<GoalCard>;
+    merge(id: string, input: { title: string; milestones: Array<{ title: string; myPart: string; partnerPart: string }> }): Promise<GoalCard>;
+    setMilestone(goalId: string, milestoneId: string, done: boolean): Promise<GoalCard>;
+    checkin(goalId: string, input: { week: string; win: string; myPart: string; need: string; blocker: string }): Promise<GoalCard>;
+    setStatus(id: string, status: "paused" | "active" | "archived"): Promise<GoalCard>;
+    rename(id: string, title: string): Promise<GoalCard>;
   };
 }
 

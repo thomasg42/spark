@@ -63,6 +63,8 @@ const o = (value: string, label: string): Option => ({ value, label });
 
 export const TEXT_ANSWER_MAX = 2000;
 
+const CONNECTION_HELP = "Private first. Skip this any time, including during a conflict. Share only if you choose. Spark does not score or predict.";
+
 export const SECTIONS: Section[] = [
   {
     key: "roots",
@@ -399,6 +401,59 @@ export const SECTIONS: Section[] = [
       },
     ],
   },
+  {
+    key: "connection",
+    title: "Connection",
+    emoji: "💬",
+    blurb: "Private reflection first. Share only if you choose. Spark shows an answer to both of you only when you both choose, and never uses these to judge or predict.",
+    phase: 1,
+    sittings: [
+      {
+        id: "connection_daily",
+        title: "A calm question",
+        questions: [
+          { id: "cq_fear", kind: "text", long: true, optional: true, prompt: "What's a fear you think I don't fully understand?", help: CONNECTION_HELP, placeholder: "Only you see this unless you later choose to share it." },
+          { id: "cq_carrying", kind: "text", long: true, optional: true, prompt: "What's something you've been carrying alone lately?", help: CONNECTION_HELP },
+          { id: "cq_closest", kind: "text", long: true, optional: true, prompt: "When do you feel closest to me?", help: CONNECTION_HELP },
+          { id: "cq_safe", kind: "text", long: true, optional: true, prompt: "What's something small I do that makes you feel safe?", help: CONNECTION_HELP },
+          { id: "cq_proud", kind: "text", long: true, optional: true, prompt: "What's something you're proud of that you haven't told me?", help: CONNECTION_HELP },
+        ],
+      },
+      {
+        id: "connection_worry",
+        title: "What you have been holding",
+        questions: [
+          { id: "cq_worry", kind: "text", long: true, optional: true, prompt: "What's a worry you've kept to yourself because you didn't want to bother me?", help: CONNECTION_HELP },
+          { id: "cq_more", kind: "text", long: true, optional: true, prompt: "What's one thing you need more of from me this month?", help: CONNECTION_HELP },
+          { id: "cq_good", kind: "text", long: true, optional: true, prompt: "When things get really good between us, what does that feel like for you? Does it ever feel unfamiliar or scary?", help: CONNECTION_HELP },
+          { id: "cq_support", kind: "text", long: true, optional: true, prompt: "What does support look like for you when you're stressed?", help: CONNECTION_HELP },
+          { id: "cq_season", kind: "text", long: true, optional: true, prompt: "What's one thing you want us to do or try together this season?", help: CONNECTION_HELP },
+        ],
+      },
+      {
+        id: "connection_deep",
+        title: "A deeper talk",
+        questions: [
+          { id: "cq_ritual", kind: "text", long: true, optional: true, prompt: "What is a small ritual from your week that you wish I knew about?", help: CONNECTION_HELP },
+          { id: "cq_evening", kind: "text", long: true, optional: true, prompt: "When you picture a calm evening for us, what are we actually doing?", help: CONNECTION_HELP },
+          { id: "cq_chosen", kind: "text", long: true, optional: true, prompt: "What helps you feel chosen, even on an ordinary day?", help: CONNECTION_HELP },
+          { id: "cq_story", kind: "text", long: true, optional: true, prompt: "Is there a story about us you like telling, and why that one?", help: CONNECTION_HELP },
+          { id: "cq_hope", kind: "text", long: true, optional: true, prompt: "What is a hope you have for the next few months that you have not said out loud?", help: CONNECTION_HELP },
+        ],
+      },
+      {
+        id: "connection_together",
+        title: "Time together",
+        questions: [
+          { id: "cq_stress", kind: "text", long: true, optional: true, prompt: "Where do you notice stress first, and what helps it settle?", help: CONNECTION_HELP },
+          { id: "cq_good_day", kind: "text", long: true, optional: true, prompt: "What is a way I can tell you are having a good day before you say it?", help: CONNECTION_HELP },
+          { id: "cq_hello", kind: "text", long: true, optional: true, prompt: "What kind of hello feels best after we have been apart?", help: CONNECTION_HELP },
+          { id: "cq_learning", kind: "text", long: true, optional: true, prompt: "What is something you are learning about yourself this year?", help: CONNECTION_HELP },
+          { id: "cq_hour", kind: "text", long: true, optional: true, prompt: "If we protected one hour together this week, how would you want to spend it?", help: CONNECTION_HELP },
+        ],
+      },
+    ],
+  },
 ];
 
 /** Sections planned for later phases, shown as "coming later" in the app. */
@@ -411,6 +466,13 @@ export const LATER_SECTIONS: Array<{ key: string; title: string; emoji: string; 
 
 export function findSection(key: string): Section | undefined {
   return SECTIONS.find((s) => s.key === key);
+}
+
+/** The coach may offer one connection question only when things are calm. */
+export function suggestConnectionQuestion(calm: boolean): string | null {
+  if (!calm) return null;
+  const section = findSection("connection");
+  return section?.sittings[0]?.questions[0]?.prompt ?? null;
 }
 
 export function findQuestion(questionId: string): { section: Section; sitting: Sitting; question: Question } | undefined {

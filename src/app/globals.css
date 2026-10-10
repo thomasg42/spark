@@ -28,8 +28,33 @@ html {
 body {
   background: var(--bg);
   color: var(--ink);
+  min-height: 100vh;
   min-height: 100dvh;
-  overflow-x: hidden;
+  overflow: hidden;
+}
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  height: 100dvh;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#app-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.app-tabbar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 h1, h2, h3, .font-display {

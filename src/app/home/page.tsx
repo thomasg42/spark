@@ -108,6 +108,8 @@ function Dashboard() {
         const pace = rhythm.current ? CADENCE_LABELS[rhythm.current] : "Rhythm pending";
         return { text: `${pace} · ${social.agreed ? SOCIAL_COPY[social.agreed].label : "Social pending"}` };
       }
+      case "goals":
+        return { text: "Goals you both own. Private versions stay hidden until you both submit." };
     }
   };
 

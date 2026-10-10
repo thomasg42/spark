@@ -1,6 +1,8 @@
 import { clearBuddySessions } from "@/lib/buddy/session";
 import type { SavedConversation } from "@shared/buddy-conversations.ts";
 import type {DemoIntimacy} from './intimacy';
+import type { AgreementRecord, BoundaryAck, BoundaryRecord } from "@shared/boundaries.ts";
+import type { GoalCheckin, GoalDraft, GoalEvent, GoalMilestone, GoalRecord } from "@shared/our-goals.ts";
 import type { DreamRecord } from "@shared/shared-dreams.ts";
 /**
  * Demo mode store: everything lives in this browser (localStorage for data,
@@ -74,6 +76,15 @@ export interface DemoState {
   distanceFlags: DistanceFlag[];
   projects: Project[];
   money: MoneyGoal[];
+  boundaries: BoundaryRecord[];
+  boundaryAcks: BoundaryAck[];
+  boundarySeen: Record<string, string>;
+  agreements: AgreementRecord[];
+  goals: GoalRecord[];
+  goalDrafts: GoalDraft[];
+  goalMilestones: GoalMilestone[];
+  goalEvents: GoalEvent[];
+  goalCheckins: GoalCheckin[];
 }
 
 const STORAGE_KEY = "spark-demo-v4";
@@ -93,6 +104,15 @@ function load(): DemoState {
         parsed.distanceFlags ??= [];
         parsed.dreams ??= [];
         parsed.dreamRoadmapConsent ??= {};
+        parsed.boundaries ??= [];
+        parsed.boundaryAcks ??= [];
+        parsed.boundarySeen ??= {};
+        parsed.agreements ??= [];
+        parsed.goals ??= [];
+        parsed.goalDrafts ??= [];
+        parsed.goalMilestones ??= [];
+        parsed.goalEvents ??= [];
+        parsed.goalCheckins ??= [];
         state = parsed;
         return state;
       }
