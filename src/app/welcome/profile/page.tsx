@@ -21,7 +21,7 @@ function ProfileForm() {
   const [birthTime, setBirthTime] = useState("");
   const [birthPlace, setBirthPlace] = useState("");
   const [accent, setAccent] = useState<AccentTheme>("rose");
-  const [mode, setMode] = useState<ColorMode>("system");
+  const [mode, setMode] = useState<ColorMode>("light");
   const [cadence, setCadence] = useState<PickableCadence>("weekly");
   const [social, setSocial] = useState<SocialLevel | null>(null);
   const [pending, setPending] = useState(false);

@@ -1,11 +1,14 @@
 import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 
+// Forward slashes keep the aliases working on Windows as well as in CI.
+const dir = (rel: string) => fileURLToPath(new URL(rel, import.meta.url)).split("\\").join("/");
+
 export default defineConfig({
   resolve: {
     alias: {
-      "@/": fileURLToPath(new URL("./src/", import.meta.url)),
-      "@shared/": fileURLToPath(new URL("./supabase/functions/_shared/", import.meta.url)),
+      "@/": dir("./src/"),
+      "@shared/": dir("./supabase/functions/_shared/"),
     },
   },
   test: {

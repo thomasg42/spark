@@ -3,7 +3,9 @@ import {readFileSync} from 'node:fs';
 import {intimacyReply} from '../../supabase/functions/_shared/intimacy-coach';
 import {INTIMACY_SYSTEM} from '../../supabase/functions/_shared/intimacy-prompts';
 const state={enabled:true,muted:true,desire:null,answers:{},overlaps:[],matched:[],sparks:[],invitations:[]};const note={repeat:'',change:'',history:[]};
-it('keeps base prompt and overlay in sync',()=>expect(INTIMACY_SYSTEM).toBe(readFileSync('prompts/spark-coach.md','utf8')+'\n\n'+readFileSync('prompts/intimacy-overlay.md','utf8')));
+// Line endings are normalized so a Windows checkout (autocrlf) compares the same text as CI.
+const lf=(t:string)=>t.replace(/\r\n/g,'\n');
+it('keeps base prompt and overlay in sync',()=>expect(lf(INTIMACY_SYSTEM)).toBe(lf(readFileSync('prompts/spark-coach.md','utf8')+'\n\n'+readFileSync('prompts/intimacy-overlay.md','utf8'))));
 it('coercion and explicit requests never call the model',async()=>{const gen=vi.fn();expect((await intimacyReply('make my partner say yes',state,note,gen,true)).reply).toContain('A no stays a no');await intimacyReply('write erotic roleplay',state,note,gen,true);expect(gen).not.toHaveBeenCalled();});
 it('untrusted model text cannot reach the UI',async()=>{const gen=vi.fn().mockResolvedValue({ok:true,json:{topic:'https://evil.test',reply:'unreviewed content'}});const result=await intimacyReply('hello',state,note,gen,true);expect(result.reply).not.toContain('evil');expect(result.reply).not.toContain('unreviewed');});
 it('does not send data without personal AI consent',async()=>{const gen=vi.fn();await intimacyReply('surprise',state,note,gen,false);expect(gen).not.toHaveBeenCalled();});

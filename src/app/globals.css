@@ -119,3 +119,34 @@ input, textarea, select {
 @media (prefers-reduced-motion: reduce) {
   .buddy-talking > span { animation: none; transform: scaleY(0.7); }
 }
+
+/* Seasonal scene (src/lib/domain/seasons.ts). The scrim keeps every word on a soft light wash. */
+.season-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+}
+.app-shell { position: relative; z-index: 1; }
+.season-scrim {
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  border-radius: var(--radius-card);
+}
+.season-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background-color: var(--surface-2);
+  background-size: cover;
+  background-position: center;
+  padding: 0.3rem;
+}
+.season-panel-words {
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--ink);
+  padding: 0.45rem 1rem;
+}

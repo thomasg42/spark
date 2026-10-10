@@ -26,41 +26,42 @@ export interface AccentTokens {
 
 export const BASE: Record<"light" | "dark", BaseTokens> = {
   light: { bg: "#FFF8F0", surface: "#FFFFFF", surface2: "#FBEFE6", ink: "#2B1B2E", muted: "#6B5A6E", line: "#E7D6CD", danger: "#B3261E", ok: "#22603F" },
-  dark: { bg: "#1A1020", surface: "#2A1C30", surface2: "#33233A", ink: "#FBEFF2", muted: "#CDB9D0", line: "#4A3752", danger: "#FF8A80", ok: "#8AD3AE" },
+  // Dusk, not near-black: a lifted plum evening so the app never feels heavy.
+  dark: { bg: "#3A2E4A", surface: "#46385A", surface2: "#504163", ink: "#FFF7FA", muted: "#E6D9EA", line: "#6A5A7E", danger: "#FFB8B0", ok: "#A6E6C4" },
 };
 
 export const ACCENTS: Record<AccentTheme, { label: string; light: AccentTokens; dark: AccentTokens }> = {
   rose: {
     label: "Rose",
     light: { accent: "#C2364F", accentInk: "#FFFFFF", accentText: "#B02A45", accentSoft: "#FCE4E9", deco: "#E85D75" },
-    dark: { accent: "#F07A8F", accentInk: "#1A1020", accentText: "#F59AAB", accentSoft: "#4A2433", deco: "#F07A8F" },
+    dark: { accent: "#F07A8F", accentInk: "#24182E", accentText: "#F59AAB", accentSoft: "#4A2433", deco: "#F07A8F" },
   },
   plum: {
     label: "Royal Plum",
     light: { accent: "#5B2A86", accentInk: "#FFFFFF", accentText: "#5B2A86", accentSoft: "#EEE4F7", deco: "#7A45AD" },
-    dark: { accent: "#B48CE0", accentInk: "#1A1020", accentText: "#C9A8EE", accentSoft: "#3B2752", deco: "#B48CE0" },
+    dark: { accent: "#B48CE0", accentInk: "#24182E", accentText: "#C9A8EE", accentSoft: "#3B2752", deco: "#B48CE0" },
   },
   ocean: {
     label: "Ocean",
     light: { accent: "#16627C", accentInk: "#FFFFFF", accentText: "#15607A", accentSoft: "#DDF0F6", deco: "#1F7A99" },
-    dark: { accent: "#5BC0DE", accentInk: "#1A1020", accentText: "#7FD0E8", accentSoft: "#1E3A47", deco: "#5BC0DE" },
+    dark: { accent: "#5BC0DE", accentInk: "#24182E", accentText: "#7FD0E8", accentSoft: "#1E3A47", deco: "#5BC0DE" },
   },
   sunset: {
     label: "Sunset",
     light: { accent: "#A84C14", accentInk: "#FFFFFF", accentText: "#A3470F", accentSoft: "#FCE8DA", deco: "#C8612A" },
-    dark: { accent: "#F4A06B", accentInk: "#1A1020", accentText: "#F7B48A", accentSoft: "#4A2E1F", deco: "#F4A06B" },
+    dark: { accent: "#F4A06B", accentInk: "#24182E", accentText: "#F7B48A", accentSoft: "#4A2E1F", deco: "#F4A06B" },
   },
   forest: {
     label: "Forest",
     light: { accent: "#256446", accentInk: "#FFFFFF", accentText: "#22603F", accentSoft: "#DFF1E7", deco: "#2F7A55" },
-    dark: { accent: "#6CC497", accentInk: "#1A1020", accentText: "#8AD3AE", accentSoft: "#1F3D2E", deco: "#6CC497" },
+    dark: { accent: "#6CC497", accentInk: "#24182E", accentText: "#8AD3AE", accentSoft: "#1F3D2E", deco: "#6CC497" },
   },
 };
 
 export const ACCENT_ORDER: AccentTheme[] = ["rose", "plum", "ocean", "sunset", "forest"];
 export const COLOR_MODES: Array<{ value: ColorMode; label: string }> = [
-  { value: "system", label: "Match my device" },
   { value: "light", label: "Light" },
+  { value: "system", label: "Match my device" },
   { value: "dark", label: "Dark" },
 ];
 

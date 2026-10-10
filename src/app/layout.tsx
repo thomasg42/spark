@@ -22,13 +22,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#FFF8F0" },
-    { media: "(prefers-color-scheme: dark)", color: "#1A1020" },
+    { media: "(prefers-color-scheme: dark)", color: "#3A2E4A" },
   ],
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" data-accent="rose" data-mode="system" suppressHydrationWarning>
+    <html lang="en" data-accent="rose" data-mode="light" suppressHydrationWarning>
       <head>
         <style dangerouslySetInnerHTML={{ __html: themeCss() }} />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />

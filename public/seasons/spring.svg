@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">
+  <defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FDF1F5"/><stop offset="1" stop-color="#EAF6EA"/></linearGradient>
+  <g id="b"><circle r="7" fill="#F6B9CB"/><circle cx="7" cy="-4" r="6" fill="#F9CAD8"/><circle cx="-6" cy="-5" r="6" fill="#F4A9BF"/><circle cx="2" cy="7" r="6" fill="#F9CAD8"/><circle cx="1" cy="0" r="2.5" fill="#E9A23B"/></g></defs>
+  <rect width="400" height="300" fill="url(#s)"/>
+  <path d="M0 250 Q100 220 200 245 T400 235 V300 H0Z" fill="#CFEACB"/>
+  <path d="M40 300 C60 230 90 170 150 120 M95 200 C120 185 150 180 175 160 M130 140 C160 120 190 110 220 95" stroke="#8C6A5A" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <use href="#b" x="150" y="118"/><use href="#b" x="176" y="158"/><use href="#b" x="222" y="93"/><use href="#b" x="120" y="150"/><use href="#b" x="200" y="104"/>
+  <use href="#b" x="300" y="60" opacity=".6"/><use href="#b" x="340" y="140" opacity=".5"/><use href="#b" x="260" y="190" opacity=".55"/><use href="#b" x="60" y="80" opacity=".5"/>
+</svg>

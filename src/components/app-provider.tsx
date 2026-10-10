@@ -27,7 +27,7 @@ export function applyTheme(profile: Pick<Profile, "accentTheme" | "colorMode"> |
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   root.dataset.accent = profile?.accentTheme ?? "rose";
-  root.dataset.mode = profile?.colorMode ?? "system";
+  root.dataset.mode = profile?.colorMode ?? "light";
   try {
     localStorage.setItem(THEME_KEY, JSON.stringify({ accent: root.dataset.accent, mode: root.dataset.mode }));
   } catch {

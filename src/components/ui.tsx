@@ -9,6 +9,7 @@ import { LAST_TAB_KEY, resolveBack } from "@/lib/ui/last-tab";
 import { isBackTo, readStack } from "@/lib/ui/nav-stack";
 
 import { cx } from "@/lib/ui/cx";
+import { SeasonMark, SeasonPanel } from "./season";
 export { cx };
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
@@ -34,6 +35,18 @@ export function Button({
     <button type={type} className={cx(base, VARIANTS[variant], className)} disabled={disabled || loading} aria-busy={loading || undefined} {...rest}>
       {loading ? <Spinner small /> : null}
       {children}
+    </button>
+  );
+}
+
+/**
+ * A button that carries a message: the seasonal picture is the background and the
+ * words sit on a light panel so they stay readable.
+ */
+export function PictureButton({ className, children, disabled, type = "button", ...rest }: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button type={type} className={cx("min-h-12 rounded-full font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 aria-pressed:ring-2 aria-pressed:ring-accent", className)} disabled={disabled} {...rest}>
+      <SeasonPanel>{children}</SeasonPanel>
     </button>
   );
 }
@@ -276,12 +289,11 @@ export function Notice({ tone = "info", title, children, className }: { tone?: "
   );
 }
 
-export function EmptyState({ emoji, title, body, action }: { emoji: string; title: string; body?: ReactNode; action?: ReactNode }) {
+/** An empty area gets one seasonal picture, not a wall of icons. `emoji` is kept for older callers and no longer drawn. */
+export function EmptyState({ title, body, action }: { emoji?: string; title: string; body?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="rounded-[var(--radius-card)] border border-dashed border-line px-6 py-10 text-center">
-      <p className="text-4xl" aria-hidden>
-        {emoji}
-      </p>
+    <div className="rounded-[var(--radius-card)] border border-dashed border-line bg-surface/80 px-6 py-10 text-center">
+      <SeasonMark className="mx-auto block h-28 w-full max-w-xs rounded-[var(--radius-card)] border border-line" />
       <p className="mt-3 text-lg font-bold text-ink">{title}</p>
       {body ? <p className="mx-auto mt-1 max-w-sm text-muted">{body}</p> : null}
       {action ? <div className="mt-5 flex justify-center">{action}</div> : null}

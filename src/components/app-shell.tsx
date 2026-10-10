@@ -8,17 +8,18 @@ import { isBackSwipe, isBackTo, readStack, recordVisit, swipeBackTarget } from "
 import { useApp } from "./app-provider";
 import { CheckinPrompt } from "./checkin/checkin-prompt";
 import { cx } from "@/lib/ui/cx";
+import { SeasonBackdrop, SeasonLabel, SeasonMark, useSeason } from "./season";
 
 const TABS = [
-  { href: "/home/", label: "Home", icon: "⌂" },
-  { href: "/moments/", label: "Moments", icon: "✦" },
-  { href: "/checkin/", label: "Check-in", icon: "♡" },
-  { href: "/plans/", label: "Plans", icon: "◷" },
-  { href: "/activities/", label: "Activities", icon: "◇" },
-  { href: "/projects/", label: "Projects", icon: "🔨" },
-  { href: "/our-story/", label: "Our Story", icon: "📖" },
-  { href: "/intimacy/", label: "Intimacy", icon: "♡" },
-  { href: "/us/", label: "Us", icon: "∞" },
+  { href: "/home/", label: "Home" },
+  { href: "/moments/", label: "Moments" },
+  { href: "/checkin/", label: "Check-in" },
+  { href: "/plans/", label: "Plans" },
+  { href: "/activities/", label: "Activities" },
+  { href: "/projects/", label: "Projects" },
+  { href: "/our-story/", label: "Our Story" },
+  { href: "/intimacy/", label: "Intimacy" },
+  { href: "/us/", label: "Us" },
 ] as const;
 
 function DemoBar() {
@@ -71,6 +72,7 @@ export function isDrillDown(pathname: string): boolean {
 export function AppShell({ children }: { children: ReactNode }) {
   const { stage, profile, partner } = useApp();
   const intimacy=useIntimacy();
+  const season = useSeason();
   const visibleTabs=TABS.filter(t=>t.href!=="/intimacy/"||intimacy.data?.enabled);
   const pathname = usePathname() ?? "/";
   const router = useRouter();
@@ -123,6 +125,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [stage, drill, pathname]);
 
   return (
+    <>
+    <SeasonBackdrop season={season} />
     <div className="app-shell">
       <a href="#main" className="sr-only-focusable fixed left-2 top-2 z-50 rounded-full bg-accent px-4 py-2 font-semibold text-accent-ink">
         Skip to content
@@ -133,6 +137,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link href={stage === "ready" ? "/home/" : "/"} className="flex min-h-11 items-center gap-2 font-display text-xl font-bold text-ink">
             <span aria-hidden className="text-deco">✦</span> Spark
           </Link>
+          <SeasonLabel season={season} />
           {stage === "ready" && profile && partner ? (
             <p className="truncate text-sm text-muted">
               {profile.nickname || profile.displayName} <span aria-hidden className="text-deco">♥</span>
@@ -143,7 +148,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <div id="app-scroll">
-        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-2xl px-4 pt-6 focus:outline-none">
+        <main id="main" tabIndex={-1} className="season-scrim mx-auto mt-3 w-full max-w-2xl px-4 pb-4 pt-6 focus:outline-none">
           <div key={pathname} className={drill ? "slide-in-right" : undefined}>
             {children}
           </div>
@@ -179,9 +184,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     aria-current={active ? "page" : undefined}
                     className={cx("flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 text-center text-xs font-semibold", active ? "text-accent-text" : "text-muted")}
                   >
-                    <span aria-hidden className="text-xl leading-none">
-                      {tab.icon}
-                    </span>
+                    <SeasonMark className={cx("h-6 w-6 rounded-full border border-line", active ? "opacity-100" : "opacity-70")} />
                     {tab.label}
                   </Link>
                 </li>
@@ -191,5 +194,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
       ) : null}
     </div>
+    </>
   );
 }

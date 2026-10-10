@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">
+  <defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF3E6"/><stop offset="1" stop-color="#F8E4D0"/></linearGradient>
+  <path id="l" d="M0 -12 C8 -6 9 4 0 12 C-9 4 -8 -6 0 -12Z M0 -10 V12" /></defs>
+  <rect width="400" height="300" fill="url(#s)"/>
+  <path d="M0 245 Q120 225 230 245 T400 238 V300 H0Z" fill="#EBC9A4"/>
+  <g stroke="#B5652E" stroke-width="1"><use href="#l" x="70" y="60" fill="#E07B39" transform="rotate(20 70 60)"/><use href="#l" x="140" y="120" fill="#D9A23A" transform="rotate(-30 140 120)"/><use href="#l" x="230" y="70" fill="#C4552F" transform="rotate(45 230 70)"/><use href="#l" x="320" y="150" fill="#E07B39" transform="rotate(-15 320 150)"/><use href="#l" x="360" y="50" fill="#D9A23A" transform="rotate(60 360 50)"/><use href="#l" x="100" y="200" fill="#C4552F" transform="rotate(-50 100 200)"/><use href="#l" x="270" y="215" fill="#D9A23A" transform="rotate(10 270 215)"/><use href="#l" x="190" y="180" fill="#E07B39" transform="rotate(80 190 180)"/></g>
+</svg>

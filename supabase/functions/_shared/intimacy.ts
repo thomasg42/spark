@@ -70,3 +70,21 @@ export function renderGuideReply(topic:CoachTopic,history:IntimacyNote['history'
  if(history.at(-1)?.content===reply)return 'We have come back to this. Before choosing another idea, name what you want to feel more of: closeness, calm, or novelty. Then ask about one small step, with room for a no.';
  return reply;
 }
+
+/** Anticipation on Our Menu. A no ends it with no follow-up. */
+export const ANTICIPATION_QUESTION='Are you looking forward to time together?';
+export const ANTICIPATION_NO='Thanks for being honest. Nothing more to do here.';
+export const ANTICIPATION_NONE='Nothing you both welcomed overlaps right now, so there is no next step to suggest.';
+/**
+ * One small next step, chosen only from mutual Yes or Maybe items (state.overlaps).
+ * Returns null when nothing overlaps; callers say so and stop.
+ */
+export function nextSmallStep(overlaps:readonly string[],seed=Math.floor(Date.now()/86400000)):IntimacyCard|null {
+ const all=INTIMACY_CATALOG.filter(c=>overlaps.includes(c.id));
+ // Gentle first: safety-gated ideas are only offered when nothing else overlaps.
+ const gentle=all.filter(c=>!c.safety);const shared=gentle.length?gentle:all;
+ if(!shared.length)return null;
+ return shared[Math.abs(Math.trunc(seed))%shared.length]!;
+}
+/** Match sheet rows: ideas both people marked Yes or Maybe. Nothing else is listed. */
+export function matchSheetRows(overlaps:readonly string[]):IntimacyCard[]{return INTIMACY_CATALOG.filter(c=>overlaps.includes(c.id));}
