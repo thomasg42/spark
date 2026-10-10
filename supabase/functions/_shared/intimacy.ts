@@ -1,9 +1,9 @@
 export const ASK_FIRST='Ask first, and check in as you go.';
 export const MENU_NOTE="Being on the menu means it’s welcome to ask. It doesn’t mean anyone owes anyone anything.";
 export const EMPTY_MENU='Shared ideas appear here when they are available. Your private answers stay yours.';
-export const EDUCATION_HOSTS=['rainn.org','www.rainn.org','www.plannedparenthood.org','www.nhs.uk','www.bcm.edu','www.issm.info'] as const;
+export const EDUCATION_HOSTS=['rainn.org','www.rainn.org','www.plannedparenthood.org','www.nhs.uk','www.bcm.edu','www.issm.info','www.healthline.com'] as const;
 export function allowedEducationLink(value:string):boolean {try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&!u.port&&(EDUCATION_HOSTS as readonly string[]).includes(u.hostname);}catch{return false;}}
-export const LEARN_LINKS=[{label:'Consent and checking in',url:'https://rainn.org/share-the-facts/consent-101-respect-boundaries-and-building-trust'},{label:'Healthy relationships',url:'https://www.plannedparenthood.org/learn/relationships/healthy-relationships'},{label:'Comfort and lubricant guidance',url:'https://www.nhs.uk/symptoms/vaginal-dryness/'}];
+export const LEARN_LINKS=[{label:'Consent and checking in',url:'https://rainn.org/share-the-facts/consent-101-respect-boundaries-and-building-trust'},{label:'Healthy relationships',url:'https://www.plannedparenthood.org/learn/relationships/healthy-relationships'},{label:'Comfort and lubricant guidance',url:'https://www.nhs.uk/symptoms/vaginal-dryness/'},{label:'Illustrated position guide: how to get into each one',url:'https://www.healthline.com/health/healthy-sex/comfortable-sex-positions'},{label:'Illustrated positions for limited mobility',url:'https://www.healthline.com/health/sexual-positions-for-limited-mobility'},{label:'Illustrated twists on classic positions',url:'https://www.healthline.com/health/healthy-sex/alternate-sex-positions-penetration'}];
 export type Choice='yes'|'maybe'|'not_now'|'no';
 export type IntimacyGuide={label:string;url:string;typingHint:string};
 export type IntimacyCard={id:string;title:string;category:string;description:string;comfort:string;pace:string;diagram:'seated'|'side'|'walk'|'talk';safety?:boolean;guide?:IntimacyGuide};
