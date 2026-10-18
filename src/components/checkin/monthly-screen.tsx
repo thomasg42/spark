@@ -15,7 +15,7 @@ import { useRhythm } from "@/lib/ui/rhythm";
 const paceLabel = (vote: PaceVote | undefined | null) => PACE_QUESTION.options.find((o) => o.value === vote)?.label ?? "No vote";
 import { answersMentionCrisis } from "@shared/checkin-summary.ts";
 
-const blank = (): CheckinAnswers => ({ best: "", closest: "", distant: "", more_of: "", talk_about: "" });
+const blank = (): CheckinAnswers => ({ best: "", closest: "", distant: "", more_of: "", talk_about: "", security: "", growth: "" });
 
 export function MonthlyScreen() {
   const params = useSearchParams();
@@ -42,10 +42,10 @@ export function MonthlyScreen() {
     <>
       <PageHeader title={formatPeriod(period)} subtitle="Monthly check-in" back={{ href: "/checkin/", label: "Check-in" }} />
       <Card>
-        <h2 className="text-xl font-bold text-ink">Five private questions</h2>
+        <h2 className="text-xl font-bold text-ink">Your private reflections</h2>
         <p className="mt-1 text-sm leading-relaxed text-muted">Your answers stay hidden from {partnerName} until you have both submitted. Answer what feels useful and leave anything blank.</p>
         <div className="mt-5 space-y-1">
-          {CHECKIN_QUESTIONS.map((q) => <TextAreaField key={q.id} label={q.prompt} hint={q.placeholder} value={answers[q.id]} onChange={(value) => setAnswers((old) => ({ ...old, [q.id]: value }))} maxLength={1000} rows={3} disabled={saved} />)}
+          {CHECKIN_QUESTIONS.map((q) => <TextAreaField key={q.id} label={q.prompt} hint={q.placeholder} value={answers[q.id] ?? ""} onChange={(value) => setAnswers((old) => ({ ...old, [q.id]: value }))} maxLength={1000} rows={3} disabled={saved} />)}
         </div>
         {!saved ? (
           <div className="mt-2">

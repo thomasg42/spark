@@ -140,7 +140,7 @@ export function CheckinPrompt({ aboveTabs }: { aboveTabs: boolean }) {
   const copy = !due
     ? null
     : due.kind === "monthly"
-      ? { title: "Time for your monthly check-in", body: `Five private questions and one about your pace. ${partnerName} sees your answers only after you both submit.`, href: "/checkin/monthly/", icon: "🗓️" }
+      ? { title: "Time for your monthly check-in", body: `Private reflections and a question about your pace. ${partnerName} sees your answers only after you both submit.`, href: "/checkin/monthly/", icon: "🗓️" }
       : due.kind === "catch-up"
         ? { title: "Quick check-in", body: `${partnerName} checked in this week. Add yours to see your trend together.`, href: "/checkin/pulse/", icon: "💓" }
         : { title: "Quick check-in", body: `Two taps on how exciting and how connected things feel.${rhythm.current ? ` Your rhythm: ${CADENCE_LABELS[rhythm.current].toLowerCase()}.` : ""}`, href: "/checkin/pulse/", icon: "💓" };

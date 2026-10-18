@@ -8,6 +8,7 @@ import { answers } from "./answers";
 import { auth } from "./auth";
 import { buddy } from "./buddy";
 import { checkins } from "./checkins";
+import { attention } from "./attention";
 import { couple } from "./couple";
 import { datePlans } from "./date-plans";
 import { dateRules, lifeChanges } from "./rhythm-breaker";
@@ -47,6 +48,7 @@ export function createDemoBackend(): Backend {
     answers,
     pulse,
     checkins,
+    attention,
     notes,
     activities,
     ideas,

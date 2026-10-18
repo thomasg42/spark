@@ -31,6 +31,18 @@ export interface SessionUser {
   email: string | null;
 }
 
+/** An explicitly shared request for attention; never contains private answers or drafts. */
+export interface AttentionSignal {
+  id: string;
+  coupleId: string;
+  authorId: string;
+  /** The author's perspective about their own or their partner's effort. */
+  subject: "self" | "partner";
+  createdAt: string;
+  acknowledgedAt: string | null;
+  resolvedAt: string | null;
+}
+
 export interface Profile {
   pronouns?: string | null;
   userId: string;
@@ -412,6 +424,20 @@ export interface Backend {
   checkins: {
     get(period: string): Promise<CheckinView>;
     submit(period: string, answers: CheckinAnswers): Promise<CheckinView>;
+  };
+
+  attention: {
+    /** Unresolved signals only, newest first. Shared immediately after an explicit raise. */
+    list(): Promise<AttentionSignal[]>;
+    /** Mutations require the initiating viewer's id; stale account views cannot act as a new user.
+     * Duplicate active signals by this author and subject are idempotent. */
+    raise(subject: AttentionSignal["subject"], expectedViewerId: string): Promise<void>;
+    /** Only the partner of the author may acknowledge. This does not resolve it. */
+    acknowledge(id: string, expectedViewerId: string): Promise<void>;
+    /** Only the author may resolve. */
+    resolve(id: string, expectedViewerId: string): Promise<void>;
+    /** Change/reconnection notifications only; no answers or signal contents are passed. */
+    subscribe(onChange: () => void): () => void;
   };
 
   notes: {

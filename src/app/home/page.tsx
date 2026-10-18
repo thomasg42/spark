@@ -81,7 +81,7 @@ function Dashboard() {
         const current = d?.history?.find((h) => h.period === periodOf(today));
         if (current?.revealed) return { text: "Revealed. Read it together.", badge: "New" };
         if (current?.iSubmitted) return { text: `Hidden until ${partnerName} answers` };
-        return { text: "Five private questions this month", badge: "Open" };
+        return { text: "Your private reflections this month", badge: "Open" };
       }
       case "notes": {
         const latest = d?.notes?.find((n) => n.authorId === partner?.userId);

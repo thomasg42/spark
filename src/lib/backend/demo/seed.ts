@@ -27,6 +27,7 @@ export function freshState(): DemoState {
     answers: {},
     pulses: [],
     checkins: [],
+    attentionSignals: [],
     notes: [],
     activities: [],
     ideas: [],
@@ -260,5 +261,6 @@ export function buildSeed(today: Date): DemoState {
     goalMilestones: [],
     goalEvents: [],
     goalCheckins: [],
+    attentionSignals: [],
   };
 }

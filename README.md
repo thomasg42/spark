@@ -4,6 +4,16 @@ A private two-person app that helps a couple stay connected for the long term: c
 
 **Phase 1** is in this repo: email sign-in and pairing, profiles with personal themes, Our Story timeline, private onboarding questionnaires, weekly pulse, monthly check-in with hidden-until-both reveal and an AI summary, appreciation notes, activity log with ratings, a Claude-powered date idea generator, cadence negotiation, a social media agreement, and **Moments** (a private feed of clips, photos, links and notes for the two of you). Later phases are in [ROADMAP.md](ROADMAP.md).
 
+## Relationship effort alerts and monthly reflection (2026-10-18)
+
+Check-in now separates feeling safe and supported from getting too comfortable in the sense of taking the relationship for granted or stopping the effort. Either partner can report a concern about their own effort or their perception of their partner's effort. Choosing Yes stays local until the person explicitly shares it. A shared Yes immediately creates a couple-visible **Needs attention** alert, independent of monthly submissions. No answers and unsubmitted choices are not saved. The alert describes the author's concern, not an automatic judgment about the other person. The partner can acknowledge it; only the author can resolve it.
+
+The shared alert appears throughout the signed-in app. Live mode subscribes to couple-scoped database changes and refreshes after reconnect/focus, with polling as a fallback. This is an in-app alert, not an operating-system push notification: an offline partner sees it when they reconnect and open Spark. Demo mode supports the same flow by switching between the fictional partners in one browser; separate phones do not sync in demo mode.
+
+Monthly check-ins also include optional questions about security/support and personal or shared goals. These answers keep the existing encrypted, hidden-until-both-submit rules. Old responses remain readable with the new optional fields blank. Summary generation does not infer a relationship problem from comfort, rest, or skipped fields.
+
+Before enabling this feature in a live deployment, apply `20261018000100_spark_attention.sql` and deploy the updated `checkins` Edge Function, then publish the frontend with the existing Supabase project variables. The public preview remains demo mode until those variables are configured. No private conversation records are included in this feature.
+
 ## Buddy conversation memory (2026-10-08)
 
 The current conversation stays in document memory across Spark navigation. Closing or fully reloading the app starts fresh; the browser cannot reliably report a phone force-close, so unsaved transcripts never go to localStorage/sessionStorage or server storage. Backgrounding alone does not clear a still-running app. New conversation also starts fresh; sign-out clears session memory.

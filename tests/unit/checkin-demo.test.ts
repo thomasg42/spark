@@ -126,6 +126,8 @@ describe("demo monthly check-in", () => {
     expect(view.mine?.best).toBe("The hot springs weekend.");
     expect(view.partner?.best).toBe("Hot springs, obviously.");
     expect(view.summary?.source).toBe("fallback");
+    expect(view.mine).toMatchObject({ security: "", growth: "" });
+    expect(view.partner).toMatchObject({ security: "", growth: "" });
   });
 
   it("reading an existing check-in does not write to the store", async () => {

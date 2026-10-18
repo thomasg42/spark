@@ -14,6 +14,7 @@ const ROWS = [
   { what: "Projects, the shared calendar, joint savings goals", who: "The two of you.", how: "Either of you can add or update them." },
   { what: "Your own savings goals", who: "Only you, unless you turn on “Let my partner see this” (they still can't change it).", how: "Spark never connects to your bank." },
   { what: "Monthly check-in answers and pace votes", who: "Only you until you both submit, then both of you.", how: "Encrypted. Revealed side by side." },
+  { what: "Relationship effort alerts", who: "Both of you as soon as you choose to share a Yes. Your partner does not need to complete a check-in first.", how: "Unsubmitted choices and No answers are not saved or shared. A shared alert records who raised the concern and whether it is about their own effort or their partner's. Your partner can acknowledge it; only its author can resolve it. In live mode, access is limited to your couple. Alerts appear inside Spark; they are not phone push notifications. Demo alerts stay in this browser." },
   { what: "Quick check-in scores", who: "Only you until you both submit for that week.", how: "Shown as a shared trend, never as blame." },
   { what: "Our Story, Moments, notes, activities, date ideas", who: "The two of you.", how: "Photos and clips live in a private folder only you two can open." },
   { what: "Name, nickname, colors, check-in rhythm, social choice", who: "The two of you.", how: "So you can see each other's choices openly." },

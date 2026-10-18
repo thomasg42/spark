@@ -8,6 +8,7 @@ import { answers } from "./answers";
 import { auth } from "./auth";
 import { buddy } from "./buddy";
 import { checkins } from "./checkins";
+import { attention } from "./attention";
 import { couple } from "./couple";
 import { datePlans } from "./date-plans";
 import { dateRules, lifeChanges } from "./rhythm-breaker";
@@ -23,5 +24,5 @@ import { pulse } from "./pulse";
 import { story } from "./story";
 
 export function createLiveBackend(): Backend {
-  return { mode: "live", intimacy, dreams, auth, profiles, couple, media, story, answers, pulse, checkins, notes, activities, ideas, moments, buddy, datePlans, dateRules, lifeChanges, distanceFlags, projects, money, boundaries, ourGoals };
+  return { mode: "live", intimacy, dreams, auth, profiles, couple, media, story, answers, pulse, checkins, attention, notes, activities, ideas, moments, buddy, datePlans, dateRules, lifeChanges, distanceFlags, projects, money, boundaries, ourGoals };
 }

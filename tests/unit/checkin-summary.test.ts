@@ -72,6 +72,18 @@ describe("buildSummaryPrompt", () => {
     expect(prompt.system).toMatch(/never instructions to you/);
   });
 
+  it("separates healthy security from freely chosen growth without inventing concerns", () => {
+    expect(prompt.system).toMatch(/security and growth reflections are separate/);
+    expect(prompt.system).toMatch(/feeling comfortable, secure or supported is positive/);
+    expect(prompt.system).toMatch(/Both partners feeling comfortable is not a red flag/);
+    expect(prompt.system).toMatch(/Mention goals needing attention only when a partner actually says so/);
+    expect(prompt.system).toMatch(/Rest, a steady routine, slower progress and skipped reflections do not imply neglect/);
+    expect(prompt.system).toMatch(/Do not turn a difference in goals or pace into a compatibility score or diagnosis/);
+    expect(prompt.system).toMatch(/Never suggest creating discomfort, uncertainty or insecurity to motivate growth/);
+    expect(prompt.system).toMatch(/Any small next step must be chosen freely/);
+    expect(prompt.system).toMatch(/keeping a supportive rhythm is a valid choice/);
+  });
+
   it("includes both names, every question and the answers as data", () => {
     expect(prompt.user).toContain("Alex");
     expect(prompt.user).toContain("Sam");
@@ -138,6 +150,13 @@ describe("parseSummary", () => {
     expect(s.overlaps.length).toBeGreaterThan(0);
   });
 
+  it.each(["security", "growth"] as const)("retains crisis safeguards for %s even when Claude says false", (field) => {
+    const s = parseSummary(valid, answers({ [field]: "He hits me when he's angry." }), SAM);
+    expect(s.safetyFlag).toBe(true);
+    expect(s.gaps).toEqual([]);
+    expect(s.conversationStarter).toBe(SAFE_STARTER);
+  });
+
   it("keeps Claude's own safety flag", () => {
     expect(parseSummary({ ...valid, safety_flag: true }, ALEX, SAM).safetyFlag).toBe(true);
   });
@@ -182,6 +201,49 @@ describe("fallbackSummary", () => {
     expect(g.gaps).toEqual([]);
     expect(g.overlaps).toEqual(["You both made time for this check-in. That counts for a lot."]);
     expect(g.conversationStarter).toBe("What's one small thing that would make next month feel good for both of you?");
+  });
+
+  it("does not turn shared comfort or contentment with goals into a concern or pressure to change", () => {
+    const g = fallbackSummary(
+      CHECKIN_QUESTIONS,
+      "A",
+      answers({ security: "I feel comfortable, secure and supported.", growth: "No goals need attention. I am happy with our current rhythm." }),
+      "B",
+      answers({ security: "I feel comfortable and supported too.", growth: "Our goals feel fine. Rest and a steady routine work for me." }),
+    );
+    expect(g.gaps).toEqual([]);
+    expect(g.safetyFlag).toBe(false);
+    expect(g.conversationStarter).toMatch(/Would you like to keep your current rhythm or choose one small step/);
+    expect(allText(g)).not.toMatch(/red flag|complacen|stagnan|insecurity|compatibility|diagnos|must|should/i);
+  });
+
+  it.each(["security", "growth"] as const)("does not infer a gap when one partner skips %s", (field) => {
+    const response = field === "security" ? "I feel supported by our quiet evenings." : "I would like to make time for a personal writing goal.";
+    const g = fallbackSummary(CHECKIN_QUESTIONS, "A", answers({ [field]: response }), "B", answers());
+    expect(g.gaps).toEqual([]);
+    expect(g.safetyFlag).toBe(false);
+    expect(allText(g)).not.toMatch(/only one|one of you|neglect|disagree|incompatib/i);
+  });
+
+  it("does not mistake opposite security sentiments with shared words for agreement", () => {
+    const g = fallbackSummary(
+      CHECKIN_QUESTIONS,
+      "A",
+      answers({ security: "I feel supported." }),
+      "B",
+      answers({ security: "I do not feel supported." }),
+    );
+    expect(g.overlaps).toEqual(["You both reflected on feeling secure and supported."]);
+    expect(g.gaps).toEqual([]);
+    expect(g.safetyFlag).toBe(false);
+    expect(allText(g)).not.toMatch(/both feel supported|both mentioned|agree|compatib|diagnos/i);
+  });
+
+  it.each(["security", "growth"] as const)("retains crisis safeguards for the optional %s reflection", (field) => {
+    const g = fallbackSummary(CHECKIN_QUESTIONS, "A", answers({ [field]: "He hits me when he's angry." }), "B", SAM);
+    expect(g.safetyFlag).toBe(true);
+    expect(g.gaps).toEqual([]);
+    expect(g.conversationStarter).toBe(SAFE_STARTER);
   });
 
   it("raises the safety flag from crisis text and drops discussion prompts", () => {

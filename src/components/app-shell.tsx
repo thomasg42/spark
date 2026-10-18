@@ -7,6 +7,7 @@ import { LAST_TAB_KEY } from "@/lib/ui/last-tab";
 import { isBackSwipe, isBackTo, readStack, recordVisit, swipeBackTarget } from "@/lib/ui/nav-stack";
 import { useApp } from "./app-provider";
 import { CheckinPrompt } from "./checkin/checkin-prompt";
+import { AttentionBanner } from "./checkin/attention-banner";
 import { cx } from "@/lib/ui/cx";
 import { SeasonBackdrop, SeasonLabel, SeasonMark, useSeason } from "./season";
 
@@ -23,10 +24,17 @@ const TABS = [
 ] as const;
 
 function DemoBar() {
-  const { backend, refresh } = useApp();
+  const { backend, refresh, stage } = useApp();
   const router = useRouter();
   const demo = backend.demo;
   if (!demo) return null;
+  // The exported page cannot know which demo partner this browser last viewed.
+  // Keep its first client render identical until the provider loads that choice.
+  if (stage === "loading") return (
+    <div className="border-b border-line bg-accent-soft px-4 py-2 text-sm text-ink">
+      <p className="mx-auto max-w-2xl"><span className="font-semibold">Demo mode.</span> Sample data, kept only in this browser.</p>
+    </div>
+  );
   const acting = demo.actingAs();
   const other = demo.personas.find((p) => p.id !== acting);
   const me = demo.personas.find((p) => p.id === acting);
@@ -149,6 +157,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div id="app-scroll">
         <main id="main" tabIndex={-1} className="season-scrim mx-auto mt-3 w-full max-w-2xl px-4 pb-4 pt-6 focus:outline-none">
+          {stage === "ready" ? <AttentionBanner /> : null}
           <div key={pathname} className={drill ? "slide-in-right" : undefined}>
             {children}
           </div>

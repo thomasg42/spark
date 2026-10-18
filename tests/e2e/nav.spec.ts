@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("bottom nav stays pinned to the viewport while the page scrolls", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
-  await page.goto("/plans/");
+  await page.goto(`${process.env.SPARK_TEST_BASE_PATH ?? ""}/plans/`);
   const nav = page.getByRole("navigation", { name: "Main" });
   const button = page.getByRole("button", { name: "Continue as Alex" });
   // Demo seed is already signed in. A fresh browser still shows the picker until that seed loads.
@@ -12,7 +12,7 @@ test("bottom nav stays pinned to the viewport while the page scrolls", async ({ 
       await button.click();
       await expect(page).toHaveURL(/\/(home|plans)\//, { timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
-    if (!page.url().includes("/plans")) await page.goto("/plans/");
+    if (!page.url().includes("/plans")) await page.goto(`${process.env.SPARK_TEST_BASE_PATH ?? ""}/plans/`);
   }
   await expect(nav).toBeVisible();
   const measure = () => nav.evaluate((el) => Math.round(el.getBoundingClientRect().bottom));

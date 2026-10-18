@@ -3,7 +3,7 @@
  *
  * Actions:
  *   { action: "get", period: "YYYY-MM" }
- *   { action: "submit", period: "YYYY-MM", answers: { best, closest, distant, more_of, talk_about } }
+ *   { action: "submit", period: "YYYY-MM", answers: { best, closest, distant, more_of, talk_about, security?, growth?, pace? } }
  *
  * Privacy:
  *  - Runs with the signed-in user's JWT, so RLS decides which responses are readable
@@ -158,7 +158,7 @@ export function validatePeriod(value: unknown, now: Date): string {
   return value;
 }
 
-/** Decrypted answers re-shaped to exactly the five known questions plus the optional pace vote. */
+/** Decrypted answers re-shaped to known questions; missing legacy fields become empty strings. */
 export function coerceAnswers(value: unknown): CheckinAnswers {
   const raw = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   const out = {} as CheckinAnswers;

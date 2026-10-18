@@ -134,6 +134,17 @@ describe("questionnaires", () => {
 });
 
 describe("check-in answers", () => {
+  it("accepts legacy submissions and defaults the new optional reflections to empty", () => {
+    const legacy = { best: "Our walk", closest: "", distant: "", more_of: "", talk_about: "" };
+    expect(normalizeCheckinAnswers(legacy)).toEqual({ ...legacy, security: "", growth: "" });
+  });
+
+  it.each(["security", "growth"])("accepts %s on its own and validates its text", (field) => {
+    expect(normalizeCheckinAnswers({ [field]: "  Things feel on track.  " })[field as "security" | "growth"]).toBe("Things feel on track.");
+    expect(() => normalizeCheckinAnswers({ [field]: 4 })).toThrow(/must be text/);
+    expect(() => normalizeCheckinAnswers({ [field]: "x".repeat(1001) })).toThrow(/too long/);
+  });
+
   it("normalizes, rejects unknown keys and all-empty submissions", () => {
     expect(normalizeCheckinAnswers({ best: " Hike ", closest: "", distant: "", more_of: "", talk_about: "" }).best).toBe("Hike");
     expect(() => normalizeCheckinAnswers({ best: "", closest: "" })).toThrow(/at least one/);

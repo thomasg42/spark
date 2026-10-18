@@ -1,5 +1,5 @@
 /**
- * Module D: the five monthly check-in questions. Each partner answers privately;
+ * Module D: the monthly check-in questions. Each partner answers privately;
  * answers stay hidden until both submit, then appear side by side. Shared by the
  * browser app and the Edge Function (which validates and summarizes them).
  */
@@ -9,6 +9,8 @@ export const CHECKIN_QUESTIONS = [
   { id: "distant", prompt: "Was there a moment you felt distant or unseen?", placeholder: "Gently. It's okay to say 'not really'." },
   { id: "more_of", prompt: "What's one thing you'd love more of next month?", placeholder: "Time, touch, plans, quiet, fun…" },
   { id: "talk_about", prompt: "Anything you'd like to talk about together?", placeholder: "Optional. A topic, a worry, a dream." },
+  { id: "security", prompt: "How secure and supported have you felt with us this month?", placeholder: "Optional. What helps you feel at ease, or what support would help? Feeling comfortable together is a good thing." },
+  { id: "growth", prompt: "Do any personal or shared goals need attention? If so, what's one small next step?", placeholder: "Optional. Name something that matters to you and a step you choose. It's okay to say things feel on track or that you need rest." },
 ] as const;
 
 export type CheckinQuestionId = (typeof CHECKIN_QUESTIONS)[number]["id"];
@@ -34,7 +36,11 @@ export function isPaceVote(value: unknown): value is PaceVote {
   return typeof value === "string" && (PACE_VOTES as readonly string[]).includes(value);
 }
 
-export type CheckinAnswers = Record<CheckinQuestionId, string> & { pace?: PaceVote };
+/** Older saved check-ins predate these reflections; their missing values mean no answer. */
+type ReflectionQuestionId = "security" | "growth";
+export type CheckinAnswers = Record<Exclude<CheckinQuestionId, ReflectionQuestionId>, string>
+  & Partial<Record<ReflectionQuestionId, string>>
+  & { pace?: PaceVote };
 
 export const CHECKIN_ANSWER_MAX = 1000;
 

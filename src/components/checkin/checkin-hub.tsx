@@ -7,6 +7,7 @@ import { CADENCE_LABELS } from "@/lib/domain/cadence";
 import { periodOf, weekStartOf } from "@/lib/domain/dates";
 import { useLoad } from "@/lib/ui/hooks";
 import { useRhythm } from "@/lib/ui/rhythm";
+import { AttentionForm } from "./attention-form";
 
 export function CheckinHub() {
   const { backend, profile, partner } = useApp();
@@ -23,6 +24,7 @@ export function CheckinHub() {
   return (
     <>
       <PageHeader title="Check-in" subtitle="Small moments to notice how you are doing together." />
+      <AttentionForm />
       <Card className="mb-5 bg-accent-soft">
         <p className="text-sm font-semibold text-accent-text">Your shared rhythm</p>
         <p className="mt-1 text-2xl font-bold text-ink">{cadenceText}</p>
@@ -32,7 +34,7 @@ export function CheckinHub() {
       {pulse.error || monthly.error || notes.error ? <Notice tone="danger" title="Some check-in details could not load.">Try opening the card again in a moment.</Notice> : null}
       <DrillList label="Check-ins">
         <li><DrillRow href="/checkin/pulse/" icon="💓" title="Quick check-in" status={pulse.data?.iSubmitted ? pulse.data.partnerSubmitted ? "You are both in. See the shared trend." : `Your answer is in. Waiting for ${partnerName}.` : "Two quick scores for excitement and connection."} badge={pulse.data?.iSubmitted ? (pulse.data.partnerSubmitted ? "Both in" : "Waiting") : pulse.data?.partnerSubmitted ? `${partnerName} is in` : "Open"} /></li>
-        <li><DrillRow href="/checkin/monthly/" icon="🗓️" title="Monthly check-in" status={monthly.data?.revealed ? "Your answers are open side by side." : monthly.data?.iSubmitted ? `Your answers stay hidden until ${partnerName} answers.` : "Five private questions, then a shared reflection."} badge={monthly.data?.revealed ? "Revealed" : monthly.data?.iSubmitted ? "Waiting" : "Open"} /></li>
+        <li><DrillRow href="/checkin/monthly/" icon="🗓️" title="Monthly check-in" status={monthly.data?.revealed ? "Your answers are open side by side." : monthly.data?.iSubmitted ? `Your answers stay hidden until ${partnerName} answers.` : "Private questions, then a shared reflection."} badge={monthly.data?.revealed ? "Revealed" : monthly.data?.iSubmitted ? "Waiting" : "Open"} /></li>
         <li><DrillRow href="/checkin/notes/" icon="💌" title="Appreciation notes" status={notes.data?.length ? `${notes.data.length} shared note${notes.data.length === 1 ? "" : "s"}. Write one when you feel it.` : "A one-line thank-you or something you noticed."} badge={notes.data?.length ? "Shared" : "Start one"} /></li>
       </DrillList>
     </>

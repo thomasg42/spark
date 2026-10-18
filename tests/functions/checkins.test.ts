@@ -41,6 +41,8 @@ const answers = (overrides: Partial<CheckinAnswers>): CheckinAnswers => ({
   distant: "",
   more_of: "",
   talk_about: "",
+  security: "",
+  growth: "",
   ...overrides,
 });
 const ALEX_ANSWERS = answers({ best: "The hot springs weekend.", distant: "When work got busy midweek.", more_of: "Lazy Saturday mornings." });
@@ -157,6 +159,32 @@ function setup(opts: { generate?: JsonGenerator | null; now?: Date } = {}) {
 }
 
 describe("checkins handler: hidden until both submit", () => {
+  it("encrypts the optional reflections and hides them even from a leaky repository until both submit", async () => {
+    const { db, call } = setup();
+    const reflection = answers({ security: "Our quiet evenings feel secure", growth: "Practice piano for ten minutes" });
+    await call(SAM, { action: "submit", period: PERIOD, answers: reflection });
+    expect(db.responses[0]!.ciphertext).not.toMatch(/quiet evenings|Practice piano/);
+    const hidden = await call(ALEX, { action: "get", period: PERIOD }, { leaky: true });
+    expect(hidden.partner).toBeNull();
+    expect(JSON.stringify(hidden)).not.toMatch(/quiet evenings|Practice piano/);
+    const revealed = await call(ALEX, { action: "submit", period: PERIOD, answers: answers({ security: "I feel supported" }) });
+    expect(revealed.partner).toEqual(reflection);
+    expect(revealed.summary?.safetyFlag).toBe(false);
+  });
+
+  it("reads encrypted legacy answers with empty optional reflections without rewriting them", async () => {
+    const { db, call } = setup();
+    const legacy = { best: "Our walk", closest: "", distant: "", more_of: "", talk_about: "" };
+    const initial = await call(ALEX, { action: "get", period: PERIOD });
+    const checkinId = initial.checkinId!;
+    const ciphertext = await sealer.encryptJson(legacy, scopes.couple(COUPLE), aad.checkinResponse(checkinId, ALEX));
+    db.responses.push({ checkinId, coupleId: COUPLE, userId: ALEX, ciphertext });
+    const view = await call(ALEX, { action: "get", period: PERIOD });
+    expect(view.mine).toEqual({ ...legacy, security: "", growth: "" });
+    expect(view.partner).toBeNull();
+    expect(db.responses[0]!.ciphertext).toBe(ciphertext);
+  });
+
   it("opens an empty check-in with nothing revealed", async () => {
     const { call } = setup();
     const view = await call(ALEX, { action: "get", period: PERIOD });

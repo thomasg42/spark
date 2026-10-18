@@ -16,6 +16,7 @@ import type { DreamRecord } from "@shared/shared-dreams.ts";
 import {
   UserFacingError,
   type Activity,
+  type AttentionSignal,
   type AppreciationNote,
   type CheckinAnswers,
   type CheckinSummary,
@@ -59,6 +60,7 @@ export interface DemoState {
   answers: Record<string, SavedAnswer[]>;
   pulses: PulseEntry[];
   checkins: DemoCheckin[];
+  attentionSignals: AttentionSignal[];
   notes: AppreciationNote[];
   activities: Activity[];
   ideas: DateIdea[];
@@ -113,6 +115,7 @@ function load(): DemoState {
         parsed.goalMilestones ??= [];
         parsed.goalEvents ??= [];
         parsed.goalCheckins ??= [];
+        parsed.attentionSignals ??= [];
         state = parsed;
         return state;
       }

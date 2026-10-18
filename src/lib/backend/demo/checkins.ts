@@ -11,7 +11,8 @@ import { demoStore, me, myCouple, newId, partnerOf, tick, type DemoCheckin, type
  * never calls an AI service, so its summary is the labelled non-AI fallback.
  */
 
-const copyAnswers = (a: CheckinAnswers | undefined | null): CheckinAnswers | null => (a ? { ...a } : null);
+const copyAnswers = (a: CheckinAnswers | undefined | null): CheckinAnswers | null =>
+  a ? { ...a, security: a.security ?? "", growth: a.growth ?? "" } : null;
 
 function nameIn(s: DemoState, userId: string): string {
   const p = s.profiles[userId];
